@@ -1,0 +1,12 @@
+bin/
+obj/
+builds/
+.vs/
+.idea/
+.cursor/
+*.user
+*.suo
+*.log
+dist/
+Thumbs.db
+.DS_Store

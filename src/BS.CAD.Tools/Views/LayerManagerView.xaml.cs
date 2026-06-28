@@ -1,0 +1,1619 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Input;
+using System.Text.Json;
+using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.EditorInput;
+using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
+using Autodesk.AutoCAD.Colors;
+using Autodesk.AutoCAD.Windows;
+using AcColor = Autodesk.AutoCAD.Colors.Color;
+using Autodesk.AutoCAD.ApplicationServices;
+using System.Windows.Controls.Primitives;
+
+using BS.CAD.Tools;
+using BS.CAD.Tools.Models;
+using BS.CAD.Tools.Utils;
+
+namespace BS.CAD.Tools.Views
+{
+    public class SimpleLayerItem : INotifyPropertyChanged
+    {
+        public string Name { get; set; } = "";
+        public bool IsOn { get; set; }
+        public double IsOnOpacity => IsOn ? 1.0 : 0.35;
+        public bool IsFrozen { get; set; }
+        public double IsFrozenOpacity => IsFrozen ? 1.0 : 0.35;
+        public bool IsLocked { get; set; }
+        public double IsLockedOpacity => IsLocked ? 1.0 : 0.35;
+        public bool IsPlottable { get; set; }
+        public double IsPlottableOpacity => IsPlottable ? 1.0 : 0.35;
+        public bool IsVPFrozen { get; set; }
+        public double IsVPFrozenOpacity => IsVPFrozen ? 1.0 : 0.35;
+        public string Linetype { get; set; } = "Continuous";
+        public string Description { get; set; } = "";
+        public bool IsCurrent { get; set; }
+        public System.Windows.Visibility IsCurrentVisibility => IsCurrent ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
+        public double CurrentMarkerWidth => IsCurrent ? 4.0 : 0.0;
+        public System.Windows.Media.Brush RowBackground => IsCurrent
+            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 43, 52))
+            : System.Windows.Media.Brushes.Transparent;
+        public System.Windows.FontWeight NameWeight => IsCurrent ? System.Windows.FontWeights.Bold : System.Windows.FontWeights.Normal;
+        public int Transparency { get; set; }
+        public string TransparencyDisplay => Transparency == 0 ? "0" : Transparency.ToString();
+        public System.Windows.Media.Brush ColorBrush { get; set; } = System.Windows.Media.Brushes.White;
+        public short ColorIndex { get; set; }
+        public byte R { get; set; }
+        public byte G { get; set; }
+        public byte B { get; set; }
+        public string LineWeightDisplay { get; set; } = "默认";
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged(string n) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
+    }
+
+    public partial class LayerManagerView : System.Windows.Controls.UserControl
+    {
+        private List<SimpleLayerItem> _cacheList = new List<SimpleLayerItem>();
+        private FilterTagInfo? _activeFilter;
+        private readonly Dictionary<System.Windows.Controls.Button, FilterTagInfo> _filterButtons = new();
+        private string _quickFilter = "All";
+
+        private Database? _watchedDb;
+        private DateTime _lastSync = DateTime.MinValue;
+        private bool _syncPending;
+        private System.Windows.Point _toolbarDragStart;
+        private bool _toolbarDragInitialized;
+
+        public LayerManagerView()
+        {
+            InitializeComponent();
+            this.Loaded += OnLoaded;
+            this.Unloaded += OnUnloaded;
+            this.IsVisibleChanged += OnIsVisibleChanged;
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            InitToolbarDrag();
+            InitSettingsPanel();
+            Dispatcher.BeginInvoke(new Action(RefreshLayerList));
+            WatchDatabase();
+            AcadApp.DocumentManager.DocumentActivated += OnDocumentActivated;
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            UnwatchDatabase();
+            AcadApp.DocumentManager.DocumentActivated -= OnDocumentActivated;
+        }
+
+        private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if ((bool)e.NewValue)
+            {
+                WatchDatabase();
+                Dispatcher.BeginInvoke(new Action(RefreshLayerList), System.Windows.Threading.DispatcherPriority.Background);
+            }
+            else
+            {
+                UnwatchDatabase();
+            }
+        }
+
+        private void WatchDatabase()
+        {
+            UnwatchDatabase();
+            var doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+            _watchedDb = doc.Database;
+            _watchedDb.ObjectModified += OnDbObjectChanged;
+            _watchedDb.ObjectAppended += OnDbObjectChanged;
+            _watchedDb.ObjectErased += OnDbObjectErased;
+            _watchedDb.SystemVariableChanged += OnSysVarChanged;
+        }
+
+        private void UnwatchDatabase()
+        {
+            if (_watchedDb != null)
+            {
+                _watchedDb.ObjectModified -= OnDbObjectChanged;
+                _watchedDb.ObjectAppended -= OnDbObjectChanged;
+                _watchedDb.ObjectErased -= OnDbObjectErased;
+                _watchedDb.SystemVariableChanged -= OnSysVarChanged;
+                _watchedDb = null;
+            }
+        }
+
+        private void OnDbObjectChanged(object sender, ObjectEventArgs e)
+        {
+            if (e.DBObject is LayerTableRecord)
+                ScheduleSync();
+        }
+
+        private void OnDbObjectErased(object sender, ObjectErasedEventArgs e)
+        {
+            if (e.DBObject is LayerTableRecord)
+                ScheduleSync();
+        }
+
+        private void OnSysVarChanged(object sender, Autodesk.AutoCAD.DatabaseServices.SystemVariableChangedEventArgs e)
+        {
+            if (e.Name == "CLAYER")
+                ScheduleSync();
+        }
+
+        private void ScheduleSync()
+        {
+            if (_syncPending) return;
+            var elapsed = (DateTime.Now - _lastSync).TotalMilliseconds;
+            if (elapsed < 500)
+            {
+                _syncPending = true;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _syncPending = false;
+                    RefreshLayerList();
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
+            else
+            {
+                _lastSync = DateTime.Now;
+                Dispatcher.BeginInvoke(new Action(RefreshLayerList), System.Windows.Threading.DispatcherPriority.Background);
+            }
+        }
+
+        private void InitSettingsPanel()
+        {
+            var labels = new[] { "新建", "当前", "删除", "刷新", "存状态", "读状态", "存模板", "读模板", "导出" };
+            var buttons = new System.Windows.Controls.Button[] { BtnNewLayer, BtnSetCurrent, BtnDeleteLayer, BtnRefresh, BtnSnapshotSave, BtnSnapshotLoad, BtnSaveTemplate, BtnLoadTemplate, BtnExport };
+
+            SettingsStack.Children.Clear();
+            for (int i = 0; i < labels.Length; i++)
+            {
+                var btn = buttons[i];
+                var toggle = new System.Windows.Controls.Button
+                {
+                    Content = labels[i],
+                    Height = 44,
+                    MinWidth = 116,
+                    Margin = new System.Windows.Thickness(0, 0, 10, 10),
+                    Style = TryFindResource("Win11ButtonStyle") as Style,
+                    Tag = btn
+                };
+                UpdateSettingsButtonVisual(toggle, btn.Visibility == System.Windows.Visibility.Visible);
+                toggle.Click += (s, e) =>
+                {
+                    bool nextVisible = btn.Visibility != System.Windows.Visibility.Visible;
+                    btn.Visibility = nextVisible ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                    UpdateSettingsButtonVisual(toggle, nextVisible);
+                };
+                SettingsStack.Children.Add(toggle);
+            }
+        }
+
+        private void InitToolbarDrag()
+        {
+            if (_toolbarDragInitialized) return;
+            _toolbarDragInitialized = true;
+            LoadToolbarOrder();
+            ToolbarPanel.AllowDrop = true;
+            foreach (var button in ToolbarPanel.Children.OfType<System.Windows.Controls.Button>())
+            {
+                button.AllowDrop = true;
+                button.PreviewMouseLeftButtonDown += OnToolbarButtonMouseLeftButtonDown;
+                button.PreviewMouseMove += OnToolbarButtonMouseMove;
+                button.DragOver += OnToolbarButtonDragOver;
+                button.Drop += OnToolbarButtonDrop;
+            }
+        }
+
+        private void OnToolbarButtonMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _toolbarDragStart = e.GetPosition(null);
+        }
+
+        private void OnToolbarButtonMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.Button button) return;
+            if (e.LeftButton != MouseButtonState.Pressed) return;
+
+            var pos = e.GetPosition(null);
+            if (Math.Abs(pos.X - _toolbarDragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(pos.Y - _toolbarDragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+
+            DragDrop.DoDragDrop(button, button, System.Windows.DragDropEffects.Move);
+        }
+
+        private void OnToolbarButtonDragOver(object sender, System.Windows.DragEventArgs e)
+        {
+            e.Effects = System.Windows.DragDropEffects.Move;
+            e.Handled = true;
+        }
+
+        private void OnToolbarButtonDrop(object sender, System.Windows.DragEventArgs e)
+        {
+            var source = e.Data.GetData(typeof(System.Windows.Controls.Button)) as System.Windows.Controls.Button;
+            var target = sender as System.Windows.Controls.Button;
+            if (source == null || target == null || source == target) return;
+
+            int targetIndex = ToolbarPanel.Children.IndexOf(target);
+            ToolbarPanel.Children.Remove(source);
+            ToolbarPanel.Children.Insert(targetIndex, source);
+            SaveToolbarOrder();
+            e.Handled = true;
+        }
+
+        private static string ToolbarOrderPath =>
+            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BS-CAD-Tools", "toolbar-order.txt");
+
+        private void LoadToolbarOrder()
+        {
+            try
+            {
+                if (!System.IO.File.Exists(ToolbarOrderPath)) return;
+                var names = System.IO.File.ReadAllLines(ToolbarOrderPath).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+                if (names.Count == 0) return;
+
+                var buttons = ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().ToDictionary(x => x.Name);
+                var ordered = new List<System.Windows.Controls.Button>();
+                foreach (var name in names)
+                    if (buttons.TryGetValue(name, out var button) && !ordered.Contains(button))
+                        ordered.Add(button);
+
+                ordered.AddRange(ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().Where(x => !ordered.Contains(x)));
+                ToolbarPanel.Children.Clear();
+                foreach (var button in ordered)
+                    ToolbarPanel.Children.Add(button);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+            }
+        }
+
+        private void SaveToolbarOrder()
+        {
+            try
+            {
+                var dir = System.IO.Path.GetDirectoryName(ToolbarOrderPath);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+
+                var names = ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().Select(x => x.Name);
+                System.IO.File.WriteAllLines(ToolbarOrderPath, names);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+            }
+        }
+
+        private static void UpdateSettingsButtonVisual(System.Windows.Controls.Button button, bool isOn)
+        {
+            button.Background = new SolidColorBrush(isOn
+                ? System.Windows.Media.Color.FromRgb(10, 132, 214)
+                : System.Windows.Media.Color.FromRgb(36, 39, 41));
+            button.BorderBrush = new SolidColorBrush(isOn
+                ? System.Windows.Media.Color.FromRgb(10, 132, 214)
+                : System.Windows.Media.Color.FromRgb(52, 58, 63));
+            button.Foreground = new SolidColorBrush(isOn
+                ? System.Windows.Media.Color.FromRgb(255, 255, 255)
+                : System.Windows.Media.Color.FromRgb(143, 154, 163));
+        }
+
+        private void OnDocumentActivated(object sender, DocumentCollectionEventArgs e)
+        {
+            WatchDatabase();
+            RefreshLayerList();
+        }
+
+        private static (byte R, byte G, byte B, short ColorIndex) ResolveLayerColor(LayerTableRecord ltr)
+        {
+            short colorIndex = 7;
+            try { colorIndex = ltr.Color.ColorIndex; } catch (Exception ex) { Logger.Error(ex); }
+
+            if (colorIndex < 1 || colorIndex > 255)
+                colorIndex = 7;
+
+            try
+            {
+                var acColor = ltr.Color;
+                if (acColor.ColorMethod == ColorMethod.ByColor)
+                {
+                    var cv = acColor.ColorValue;
+                    return (cv.R, cv.G, cv.B, colorIndex);
+                }
+            }
+            catch (Exception ex) { Logger.Error(ex); }
+
+            try
+            {
+                var cv = Autodesk.AutoCAD.Colors.Color.FromColorIndex(ColorMethod.ByAci, colorIndex).ColorValue;
+                return (cv.R, cv.G, cv.B, colorIndex);
+            }
+            catch (Exception ex) { Logger.Error(ex); }
+
+            return (255, 255, 255, colorIndex);
+        }
+
+        private static int ResolveLayerTransparency(LayerTableRecord ltr)
+        {
+            try
+            {
+                var t = ltr.Transparency;
+                if (t.IsByLayer || t.IsByBlock) return 0;
+                return t.Alpha;
+            }
+            catch (Exception ex) { Logger.Error(ex); return 0; }
+        }
+
+        private static string ResolveLineWeight(LayerTableRecord ltr)
+        {
+            try
+            {
+                var lw = ltr.LineWeight;
+                if (lw == LineWeight.ByLayer) return "ByLayer";
+                if (lw == LineWeight.ByBlock) return "ByBlock";
+                if (lw == LineWeight.ByLineWeightDefault) return "默认";
+                return LineWeightToMm(lw);
+            }
+            catch { return "默认"; }
+        }
+
+        private static string LineWeightToMm(LineWeight lw) => lw switch
+        {
+            LineWeight.LineWeight000 => "0.00",
+            LineWeight.LineWeight005 => "0.05",
+            LineWeight.LineWeight009 => "0.09",
+            LineWeight.LineWeight013 => "0.13",
+            LineWeight.LineWeight015 => "0.15",
+            LineWeight.LineWeight018 => "0.18",
+            LineWeight.LineWeight020 => "0.20",
+            LineWeight.LineWeight025 => "0.25",
+            LineWeight.LineWeight030 => "0.30",
+            LineWeight.LineWeight035 => "0.35",
+            LineWeight.LineWeight040 => "0.40",
+            LineWeight.LineWeight050 => "0.50",
+            LineWeight.LineWeight053 => "0.53",
+            LineWeight.LineWeight060 => "0.60",
+            LineWeight.LineWeight070 => "0.70",
+            LineWeight.LineWeight080 => "0.80",
+            LineWeight.LineWeight090 => "0.90",
+            LineWeight.LineWeight100 => "1.00",
+            LineWeight.LineWeight106 => "1.06",
+            LineWeight.LineWeight120 => "1.20",
+            LineWeight.LineWeight140 => "1.40",
+            LineWeight.LineWeight158 => "1.58",
+            LineWeight.LineWeight200 => "2.00",
+            LineWeight.LineWeight211 => "2.11",
+            _ => "默认"
+        };
+
+        public void RefreshLayerList()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(RefreshLayerList));
+                return;
+            }
+
+            var doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                _cacheList = new List<SimpleLayerItem>();
+                TxtStatus.Text = "同步图层: 0（无活动图纸）";
+                GridLayers.ItemsSource = null;
+                return;
+            }
+
+            AcadApp.DocumentManager.ExecuteInApplicationContext(_ => LoadLayersFromDatabase(), null);
+        }
+
+        private void LoadLayersFromDatabase()
+        {
+            try {
+                var doc = AcadApp.DocumentManager.MdiActiveDocument;
+                if (doc == null) return;
+
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction()) {
+                    var items = new List<SimpleLayerItem>();
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null)
+                    {
+                        Dispatcher.BeginInvoke(new Action(() => TxtStatus.Text = "同步图层: 0（无法读取图层表）"));
+                        return;
+                    }
+                    ObjectId curId = doc.Database.Clayer;
+
+                    foreach (ObjectId id in lt) {
+                        LayerTableRecord? ltr = tr.GetObject(id, OpenMode.ForRead) as LayerTableRecord;
+                        if (ltr == null || ltr.IsErased) continue;
+
+                        var (r, g, b, colorIndex) = ResolveLayerColor(ltr);
+                        string ltName = "Continuous";
+                        if (!ltr.LinetypeObjectId.IsNull)
+                        {
+                            try {
+                                var ltRec = tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) as LinetypeTableRecord;
+                                if (ltRec != null) ltName = ltRec.Name;
+                            } catch (Exception ex) { Logger.Error(ex); }
+                        }
+
+                        var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(r, g, b));
+                        brush.Freeze();
+
+                        items.Add(new SimpleLayerItem {
+                            Name = ltr.Name, IsOn = !ltr.IsOff, IsFrozen = ltr.IsFrozen, IsLocked = ltr.IsLocked,
+                            IsPlottable = ltr.IsPlottable, IsVPFrozen = ltr.ViewportVisibilityDefault,
+                            Linetype = ltName, Description = ltr.Description ?? "",
+                            Transparency = ResolveLayerTransparency(ltr),
+                            IsCurrent = (id == curId), ColorIndex = colorIndex,
+                            ColorBrush = brush, R = r, G = g, B = b,
+                            LineWeightDisplay = ResolveLineWeight(ltr)
+                        });
+                    }
+
+                    foreach (var item in items)
+                    {
+                    }
+
+                    tr.Commit();
+                    _cacheList = items;
+                    Dispatcher.BeginInvoke(new Action(UpdateDisplay));
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Logger.Error(ex);
+                AcadApp.ShowAlertDialog(ex.Message);
+            }
+        }
+
+        public void RefreshObjectCounts()
+        {
+            // 功能已删除
+        }
+
+        private void UpdateDisplay()
+        {
+            TraceLog.Step("UpdateDisplay:ENTER");
+            try {
+                string s = TxtSearch.Text.ToLower();
+                IEnumerable<SimpleLayerItem> query = _cacheList;
+
+                if (_activeFilter?.LayerNames is { Count: > 0 } names)
+                    query = query.Where(x => names.Contains(x.Name));
+
+                query = _quickFilter switch
+                {
+                    "On" => query.Where(x => x.IsOn),
+                    "Off" => query.Where(x => !x.IsOn),
+                    "Frozen" => query.Where(x => x.IsFrozen),
+                    "Locked" => query.Where(x => x.IsLocked),
+                    "Current" => query.Where(x => x.IsCurrent),
+                    _ => query
+                };
+
+                var f = query.Where(x =>
+                    string.IsNullOrEmpty(s)
+                    || x.Name.ToLower().Contains(s)
+                    || x.ColorIndex.ToString().Contains(s)
+                    || x.Linetype.ToLower().Contains(s)
+                ).ToList();
+                TraceLog.Step($"UpdateDisplay:filtered {f.Count} items, before ItemsSource");
+                GridLayers.ItemsSource = f;
+                TraceLog.Step("UpdateDisplay:ItemsSource set");
+                UpdateStatus(f.Count);
+            } catch (Exception ex) { TraceLog.Step($"UpdateDisplay:CATCH {ex.GetType().Name}: {ex.Message}"); Logger.Error(ex); }
+        }
+
+        private void UpdateStatus(int? visibleCount = null)
+        {
+            int visible = visibleCount ?? (GridLayers.ItemsSource as IEnumerable<SimpleLayerItem>)?.Count() ?? _cacheList.Count;
+            int selected = GridLayers.SelectedItems?.Count ?? 0;
+            string current = _cacheList.FirstOrDefault(x => x.IsCurrent)?.Name ?? "无";
+            TxtStatus.Text = $"共 {_cacheList.Count} 层 / 显示 {visible} 层 / 已选 {selected} 层 / 当前层: {current}";
+        }
+
+        private void OnGridSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateStatus();
+
+        private void OnGridPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            var header = FindVisualParent<DataGridColumnHeader>(e.OriginalSource as DependencyObject);
+            var pos = e.GetPosition(GridLayers);
+            if (header != null || pos.Y <= 72)
+            {
+                if (TryFindResource("HeaderContextMenu") is System.Windows.Controls.ContextMenu menu)
+                {
+                    menu.IsOpen = false;
+                    menu.PlacementTarget = GridLayers;
+                    SyncHeaderMenuCheckStates(menu);
+                    menu.IsOpen = true;
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                if (child is T match) return match;
+                child = VisualTreeHelper.GetParent(child);
+            }
+            return null;
+        }
+
+        private void SyncHeaderMenuCheckStates(System.Windows.Controls.ContextMenu menu)
+        {
+            foreach (var item in menu.Items.OfType<System.Windows.Controls.MenuItem>())
+            {
+                string h = item.Header?.ToString() ?? "";
+                var col = GridLayers.Columns.FirstOrDefault(c => c.Header?.ToString() == h);
+                if (col != null)
+                    item.IsChecked = col.Visibility == System.Windows.Visibility.Visible;
+            }
+        }
+
+        private void OnHeaderContextMenuOpened(object sender, RoutedEventArgs e)
+        {
+            var menu = sender as System.Windows.Controls.ContextMenu;
+            if (menu == null) return;
+            SyncHeaderMenuCheckStates(menu);
+        }
+
+        private void OnColumnVisibilityToggle(object sender, RoutedEventArgs e)
+        {
+            var mi = sender as System.Windows.Controls.MenuItem;
+            if (mi == null) return;
+            string h = mi.Header?.ToString() ?? "";
+            foreach (var c in GridLayers.Columns) {
+                if (c.Header?.ToString() == h) {
+                    c.Visibility = mi.IsChecked ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                    break;
+                }
+            }
+            // 强制刷新菜单项状态（虽然是点选，但为了保险）
+            if (mi.Parent is System.Windows.Controls.ContextMenu menu) SyncHeaderMenuCheckStates(menu);
+        }
+
+        private void OnShowAllColumns(object sender, RoutedEventArgs e)
+        {
+            foreach (var c in GridLayers.Columns)
+                c.Visibility = System.Windows.Visibility.Visible;
+            if ((sender as System.Windows.Controls.MenuItem)?.Parent is System.Windows.Controls.ContextMenu menu)
+                SyncHeaderMenuCheckStates(menu);
+        }
+
+        private void OnRestoreDefaultColumns(object sender, RoutedEventArgs e)
+        {
+            foreach (var c in GridLayers.Columns)
+                c.Visibility = System.Windows.Visibility.Visible;
+            if ((sender as System.Windows.Controls.MenuItem)?.Parent is System.Windows.Controls.ContextMenu menu)
+                SyncHeaderMenuCheckStates(menu);
+        }
+
+        private void OnToggleStatus(object sender, RoutedEventArgs e)
+        {
+            try {
+                var btn = sender as System.Windows.Controls.Button;
+                var item = btn?.DataContext as SimpleLayerItem;
+                if (item == null) return;
+
+                string tag = btn?.Tag?.ToString() ?? "";
+                var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+                if (!sel.Contains(item)) sel = new List<SimpleLayerItem> { item };
+
+                var doc = AcadApp.DocumentManager.MdiActiveDocument;
+                if (doc == null) return;
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction()) {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null) return;
+                    bool? targetState = tag switch
+                    {
+                        "On" => !item.IsOn,
+                        "Freeze" => !item.IsFrozen,
+                        "Lock" => !item.IsLocked,
+                        "Plot" => !item.IsPlottable,
+                        "VPFreeze" => !item.IsVPFrozen,
+                        _ => null
+                    };
+
+                    foreach (var s in sel) {
+                        if (lt.Has(s.Name)) {
+                            var ltr = tr.GetObject(lt[s.Name], OpenMode.ForWrite) as LayerTableRecord;
+                            if (ltr == null || targetState == null) continue;
+
+                            if (tag == "On") ltr.IsOff = !targetState.Value;
+                            else if (tag == "Freeze" && !s.IsCurrent) ltr.IsFrozen = targetState.Value;
+                            else if (tag == "Lock") ltr.IsLocked = targetState.Value;
+                            else if (tag == "Plot") ltr.IsPlottable = targetState.Value;
+                            else if (tag == "VPFreeze") ltr.ViewportVisibilityDefault = targetState.Value;
+                        }
+                    }
+                    tr.Commit();
+                }
+                RefreshLayerList();
+                doc.Editor.Regen();
+            } catch (System.Exception ex) { Logger.Error(ex); AcadApp.ShowAlertDialog(ex.Message); }
+        }
+
+        private bool IsFilterLabelTaken(string label, System.Windows.Controls.Button? exclude = null)
+        {
+            return StackFilters.Children.OfType<System.Windows.Controls.Button>()
+                .Where(b => b != exclude)
+                .Any(b => string.Equals(b.Content?.ToString(), label, StringComparison.Ordinal));
+        }
+
+        private void CreateFilterLabel(string label, IEnumerable<string> layerNames)
+        {
+            TraceLog.Step($"CreateFilterLabel:ENTER label={label}");
+            if (string.IsNullOrWhiteSpace(label) || label == "全部") return;
+            if (IsFilterLabelTaken(label)) return;
+
+            try
+            {
+                var info = new FilterTagInfo
+                {
+                    Label = label,
+                    LayerNames = new HashSet<string>(layerNames)
+                };
+                TraceLog.Step("CreateFilterLabel:FilterTagInfo created");
+
+                var style = BtnFilterAll.Style;
+                if (style == null)
+                {
+                    TraceLog.Step("CreateFilterLabel: BtnFilterAll.Style is NULL, using FindResource fallback");
+                    try { style = FindResource("FilterButtonStyle") as Style; } catch { }
+                }
+                var btn = new System.Windows.Controls.Button
+                {
+                    Content = label,
+                    Style = style
+                };
+                _filterButtons[btn] = info;
+                TraceLog.Step("CreateFilterLabel:Button created");
+
+                var cm = new System.Windows.Controls.ContextMenu();
+                var renameMi = new System.Windows.Controls.MenuItem { Header = "重命名" };
+                renameMi.Click += (_, _) => OnRenameFilter(btn);
+                var deleteMi = new System.Windows.Controls.MenuItem { Header = "删除" };
+                deleteMi.Click += (_, _) => OnDeleteFilter(btn);
+                cm.Items.Add(renameMi);
+                cm.Items.Add(deleteMi);
+                btn.ContextMenu = cm;
+                TraceLog.Step("CreateFilterLabel:ContextMenu created");
+
+                btn.Click += OnFilterLabelClick;
+                TraceLog.Step("CreateFilterLabel:before Children.Add");
+                StackFilters.Children.Add(btn);
+                TraceLog.Step("CreateFilterLabel:after Children.Add, before SetActive");
+                SetActiveFilterButton(btn);
+                TraceLog.Step("CreateFilterLabel:SetActiveFilterButton done");
+            }
+            catch (Exception ex)
+            {
+                TraceLog.Step($"CreateFilterLabel:CATCH {ex.GetType().Name}: {ex.Message}");
+                Logger.Error(ex);
+                System.Windows.Forms.MessageBox.Show(
+                    $"CreateFilterLabel 失败:\n{ex.GetType().Name}: {ex.Message}\n\n{ex.StackTrace}",
+                    "CAD助手 错误",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Error);
+            }
+        }
+
+        private void OnRenameFilter(System.Windows.Controls.Button btn)
+        {
+            if (!_filterButtons.TryGetValue(btn, out var info)) return;
+
+            string? newName = InputDialog.Show("重命名筛选标签", "请输入新名称：", info.Label);
+            if (string.IsNullOrWhiteSpace(newName) || newName == "全部") return;
+            if (IsFilterLabelTaken(newName, btn))
+            {
+                AcadApp.ShowAlertDialog("该标签名称已存在。");
+                return;
+            }
+
+            info.Label = newName;
+            btn.Content = newName;
+            if (_activeFilter == info)
+                UpdateDisplay();
+        }
+
+        private void OnDeleteFilter(System.Windows.Controls.Button btn)
+        {
+            bool wasActive = _filterButtons.TryGetValue(btn, out var info) && _activeFilter == info;
+            _filterButtons.Remove(btn);
+            StackFilters.Children.Remove(btn);
+
+            if (wasActive)
+                SetActiveFilterButton(BtnFilterAll);
+        }
+
+        private void ClearCustomFilters()
+        {
+            foreach (var btn in _filterButtons.Keys.ToList())
+                StackFilters.Children.Remove(btn);
+
+            _filterButtons.Clear();
+            _activeFilter = null;
+            BtnFilterAll.Tag = "active";
+        }
+
+        private void OnAddFilterFromSelection(object sender, RoutedEventArgs e)
+        {
+            TraceLog.Step("OnAddFilterFromSelection:ENTER");
+            try
+            {
+                var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+                TraceLog.Step($"OnAddFilterFromSelection:sel.Count={sel.Count}");
+                if (sel.Count == 0)
+                {
+                    AcadApp.ShowAlertDialog("请先选中至少一个图层。");
+                    return;
+                }
+
+                string? name = InputDialog.Show("添加过滤标签", "请输入标签名称：");
+                TraceLog.Step($"OnAddFilterFromSelection:InputDialog returned name={name}");
+                if (string.IsNullOrWhiteSpace(name) || name == "全部")
+                    return;
+                if (IsFilterLabelTaken(name))
+                {
+                    AcadApp.ShowAlertDialog("该标签名称已存在。");
+                    return;
+                }
+
+                TraceLog.Step("OnAddFilterFromSelection: calling CreateFilterLabel");
+                CreateFilterLabel(name, sel.Select(s => s.Name));
+                TraceLog.Step("OnAddFilterFromSelection: CreateFilterLabel done");
+            }
+            catch (Exception ex)
+            {
+                TraceLog.Step($"OnAddFilterFromSelection:CATCH {ex.GetType().Name}: {ex.Message}");
+                Logger.Error(ex);
+                System.Windows.Forms.MessageBox.Show(
+                    $"创建过滤标签失败:\n{ex.GetType().Name}: {ex.Message}\n\n{ex.StackTrace}",
+                    "CAD助手 错误",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Error);
+            }
+        }
+
+        private void OnFilterLabelClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button btn)
+                SetActiveFilterButton(btn);
+        }
+
+        private void OnQuickFilterClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.Button btn) return;
+            _quickFilter = btn.CommandParameter?.ToString() ?? "All";
+            SetActiveQuickFilterButton(btn);
+            UpdateDisplay();
+        }
+
+        private void SetActiveQuickFilterButton(System.Windows.Controls.Button activeBtn)
+        {
+            foreach (var b in StackQuickFilters.Children.OfType<System.Windows.Controls.Button>())
+                b.Tag = b == activeBtn ? "active" : null;
+        }
+
+        private void SetActiveFilterButton(System.Windows.Controls.Button activeBtn)
+        {
+            TraceLog.Step("SetActiveFilterButton:ENTER");
+            foreach (var b in StackFilters.Children.OfType<System.Windows.Controls.Button>())
+                b.Tag = b == activeBtn ? "active" : null;
+
+            if (activeBtn == BtnFilterAll)
+                _activeFilter = null;
+            else if (_filterButtons.TryGetValue(activeBtn, out var info))
+                _activeFilter = info;
+
+            TraceLog.Step("SetActiveFilterButton:before UpdateDisplay");
+            UpdateDisplay();
+            TraceLog.Step("SetActiveFilterButton:done");
+        }
+
+        private void OnSetCurrent(object sender, RoutedEventArgs e)
+        {
+            var i = GridLayers.SelectedItem as SimpleLayerItem;
+            if (i == null) return;
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            ExecuteLayerAction(i.Name, ltr => doc.Database.Clayer = ltr.ObjectId);
+            RefreshLayerList();
+        }
+
+        private void OnDeleteLayer(object sender, RoutedEventArgs e)
+        {
+            var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+            if (sel.Count == 0) { AcadApp.ShowAlertDialog("请先选中要删除的图层。"); return; }
+            if (System.Windows.MessageBox.Show($"将尝试删除 {sel.Count} 个图层。当前图层和正在使用的图层会自动跳过。\n\n建议先保存图纸，是否继续？", "CAD助手 - 删除图层确认", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction()) {
+                LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                if (lt == null) return;
+                foreach (var s in sel)
+                    if (!s.IsCurrent && lt.Has(s.Name))
+                    {
+                        try
+                        {
+                            if (tr.GetObject(lt[s.Name], OpenMode.ForWrite) is LayerTableRecord ltr)
+                                ltr.Erase();
+                        }
+                        catch (Exception ex) { Logger.Error(ex); TxtStatus.Text = $"无法删除图层: {s.Name}"; }
+                    }
+                tr.Commit();
+            }
+            RefreshLayerList();
+        }
+
+        private void OnToggleSettings(object sender, RoutedEventArgs e) => GridSettings.Visibility = (GridSettings.Visibility == System.Windows.Visibility.Visible) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+
+        private void ExecuteLayerAction(string n, Action<LayerTableRecord> a)
+        {
+            var doc = GetActiveDocument(false);
+            if (doc == null) return;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction()) {
+                LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                if (lt != null && lt.Has(n) && tr.GetObject(lt[n], OpenMode.ForWrite) is LayerTableRecord ltr) a(ltr);
+                tr.Commit();
+            }
+        }
+
+        private Document? GetActiveDocument(bool showMessage = true)
+        {
+            var doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null && showMessage)
+                AcadApp.ShowAlertDialog("请先打开一张图纸。");
+            return doc;
+        }
+
+        private void OnSearchChanged(object s, System.Windows.Controls.TextChangedEventArgs e) => UpdateDisplay();
+        private void OnSearchGotFocus(object s, RoutedEventArgs e) => CadApp.SwitchToIME(CadApp.TargetChineseHKL);
+
+        private void OnGridCellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
+        {
+            if (e.Column.Header?.ToString() == "说明")
+            {
+                var item = e.Row.Item as SimpleLayerItem;
+                var tb = e.EditingElement as System.Windows.Controls.TextBox;
+                if (item != null && tb != null && tb.Text != item.Description)
+                {
+                    string newDesc = tb.Text ?? "";
+                    string layerName = item.Name;
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        ExecuteLayerAction(layerName, ltr => ltr.Description = newDesc);
+                    }));
+                    item.Description = newDesc;
+                }
+            }
+        }
+        private void OnTransparencyClick(object s, RoutedEventArgs e)
+        {
+            var i = (s as System.Windows.Controls.Button)?.DataContext as SimpleLayerItem;
+            if (i == null) return;
+
+            string? input = InputDialog.Show("修改透明度", "请输入透明度 (0=不透明, 90=最透明)：", i.TransparencyDisplay);
+            if (string.IsNullOrWhiteSpace(input)) return;
+
+            if (byte.TryParse(input, out byte alpha) && alpha <= 90)
+            {
+                ExecuteLayerAction(i.Name, ltr =>
+                {
+                    ltr.Transparency = new Autodesk.AutoCAD.Colors.Transparency(alpha);
+                });
+                RefreshLayerList();
+            }
+            else
+            {
+                AcadApp.ShowAlertDialog("请输入 0-90 之间的数值。");
+            }
+        }
+
+        private void OnLinetypeClick(object s, RoutedEventArgs e)
+        {
+            var i = (s as System.Windows.Controls.Button)?.DataContext as SimpleLayerItem;
+            if (i == null) return;
+
+            var linetypes = new System.Collections.Generic.List<string>();
+            ObjectId targetLtId = ObjectId.Null;
+            var doc = AcadApp.DocumentManager.MdiActiveDocument;
+
+            try
+            {
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    var ltt = tr.GetObject(doc.Database.LinetypeTableId, OpenMode.ForRead) as LinetypeTable;
+                    if (ltt != null)
+                    {
+                        foreach (ObjectId id in ltt)
+                        {
+                            var ltr = tr.GetObject(id, OpenMode.ForRead) as LinetypeTableRecord;
+                            if (ltr != null) linetypes.Add(ltr.Name);
+                        }
+                    }
+                    tr.Commit();
+                }
+            }
+            catch (System.Exception ex) { Logger.Error(ex); }
+
+            var sorted = linetypes.OrderBy(x => x).ToList();
+            string? newLt = InputDialog.Select("修改线型", "选择线型：", sorted, i.Linetype);
+            if (string.IsNullOrWhiteSpace(newLt) || newLt == i.Linetype) return;
+
+            try
+            {
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    var ltt = tr.GetObject(doc.Database.LinetypeTableId, OpenMode.ForRead) as LinetypeTable;
+                    if (ltt != null && ltt.Has(newLt))
+                        targetLtId = ltt[newLt];
+                    tr.Commit();
+                }
+            }
+            catch (System.Exception ex) { Logger.Error(ex); }
+
+            if (targetLtId.IsNull)
+            {
+                AcadApp.ShowAlertDialog($"线型 '{newLt}' 不存在。");
+                return;
+            }
+
+            var capturedId = targetLtId;
+            ExecuteLayerAction(i.Name, ltr => { ltr.LinetypeObjectId = capturedId; });
+            RefreshLayerList();
+        }
+        private void OnGridDoubleClick(object s, MouseButtonEventArgs e) => OnSetCurrent(s, e);
+        private void OnColorClick(object s, RoutedEventArgs e)
+        {
+            var i = (s as System.Windows.Controls.Button)?.DataContext as SimpleLayerItem;
+            if (i == null) return;
+
+            AcColor current;
+            try
+            {
+                current = AcColor.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, i.ColorIndex);
+            }
+            catch
+            {
+                current = AcColor.FromRgb(i.R, i.G, i.B);
+            }
+
+            var result = ColorPickerDialog.Show(current);
+            if (result != null)
+            {
+                ExecuteLayerAction(i.Name, ltr => ltr.Color = result);
+                RefreshLayerList();
+            }
+        }
+        private void OnRefreshManual(object s, RoutedEventArgs e)
+        {
+            RefreshLayerList();
+        }
+
+        private void OnGridKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.F2)
+            {
+                var item = GridLayers.SelectedItem as SimpleLayerItem;
+                if (item != null) RenameLayer(item);
+                e.Handled = true;
+            }
+        }
+
+        private void OnRenameLayer(object sender, RoutedEventArgs e)
+        {
+            var item = GridLayers.SelectedItem as SimpleLayerItem;
+            if (item != null) RenameLayer(item);
+        }
+
+        private void RenameLayer(SimpleLayerItem item)
+        {
+            var result = InputDialog.ShowLayerFields("重命名图层", item.Name, item.Description);
+            if (result == null) return;
+            string newName = result.Value.Name.Trim();
+            string newDescription = result.Value.Description ?? "";
+            if (string.IsNullOrWhiteSpace(newName)) return;
+            bool nameChanged = newName != item.Name;
+            bool descChanged = newDescription != item.Description;
+            if (!nameChanged && !descChanged) return;
+
+            try
+            {
+                var doc = GetActiveDocument();
+                if (doc == null) return;
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt != null && lt.Has(item.Name) && (!nameChanged || !lt.Has(newName)))
+                    {
+                        var ltr = tr.GetObject(lt[item.Name], OpenMode.ForWrite) as LayerTableRecord;
+                        if (ltr != null)
+                        {
+                            if (nameChanged) ltr.Name = newName;
+                            if (descChanged) ltr.Description = newDescription;
+                        }
+                        tr.Commit();
+                        RefreshLayerList();
+                    }
+                    else
+                    {
+                        tr.Commit();
+                        AcadApp.ShowAlertDialog(lt != null && lt.Has(newName) ? "图层名称已存在。" : "无法重命名图层。");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Logger.Error(ex);
+                AcadApp.ShowAlertDialog($"重命名失败: {ex.Message}");
+            }
+        }
+
+        private void OnRowContextMenuOpened(object sender, RoutedEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.ContextMenu menu) return;
+            int selectedCount = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Count();
+            bool single = selectedCount <= 1;
+
+            SetMenuItemVisibility(menu, "设为当前图层", single);
+            SetMenuItemVisibility(menu, "重命名 / 说明", single);
+            if (menu.Items.OfType<System.Windows.Controls.Separator>().FirstOrDefault() is System.Windows.Controls.Separator sep)
+                sep.Visibility = single ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        }
+
+        private static void SetMenuItemVisibility(System.Windows.Controls.ContextMenu menu, string header, bool visible)
+        {
+            var item = menu.Items.OfType<System.Windows.Controls.MenuItem>()
+                .FirstOrDefault(x => string.Equals(x.Header?.ToString(), header, StringComparison.Ordinal));
+            if (item != null)
+                item.Visibility = visible ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        }
+
+        private void OnFilterByColor(object s, RoutedEventArgs e)
+        {
+            var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+            if (sel.Count == 0)
+            {
+                AcadApp.ShowAlertDialog("请先选中至少一个图层。");
+                return;
+            }
+
+            var item = sel[0];
+            string colorLabel = item.ColorIndex > 0 && item.ColorIndex <= 255
+                ? $"颜色 {item.ColorIndex}"
+                : $"RGB({item.R},{item.G},{item.B})";
+
+            string? name = InputDialog.Show("筛选颜色", "请输入标签名称：", colorLabel);
+            if (string.IsNullOrWhiteSpace(name) || name == "全部") return;
+            if (IsFilterLabelTaken(name))
+            {
+                AcadApp.ShowAlertDialog("该标签名称已存在。");
+                return;
+            }
+
+            var matching = _cacheList
+                .Where(x => x.ColorIndex == item.ColorIndex && x.R == item.R && x.G == item.G && x.B == item.B)
+                .Select(x => x.Name).ToList();
+
+            CreateFilterLabel(name, matching);
+        }
+
+        private void OnFilterByPrefix(object s, RoutedEventArgs e)
+        {
+            TraceLog.Step("OnFilterByPrefix:ENTER");
+            try
+            {
+                var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+                if (sel.Count == 0)
+                {
+                    AcadApp.ShowAlertDialog("请先选中至少一个图层。");
+                    return;
+                }
+
+                string first = sel[0].Name;
+                int dash = first.IndexOf('-');
+                string prefix = dash > 0 ? first.Substring(0, dash) : first;
+
+                TraceLog.Step($"OnFilterByPrefix: prefix={prefix}, calling InputDialog");
+                string? name = InputDialog.Show("筛选前缀", "请输入标签名称：", prefix);
+                if (string.IsNullOrWhiteSpace(name) || name == "全部") return;
+                if (IsFilterLabelTaken(name))
+                {
+                    AcadApp.ShowAlertDialog("该标签名称已存在。");
+                    return;
+                }
+
+                var matching = _cacheList.Where(x => x.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                    || x.Name.Contains(prefix)).Select(x => x.Name).ToList();
+                TraceLog.Step($"OnFilterByPrefix: matching={matching.Count}, calling CreateFilterLabel");
+                CreateFilterLabel(name, matching);
+                TraceLog.Step("OnFilterByPrefix: done");
+            }
+            catch (Exception ex)
+            {
+                TraceLog.Step($"OnFilterByPrefix:CATCH {ex.GetType().Name}: {ex.Message}");
+                Logger.Error(ex);
+            }
+        }
+
+
+
+        // ── Layer Snapshots ──
+        private Dictionary<string, (bool on, bool frozen, bool locked)>? _snapshot;
+
+        private void OnSnapshotSave(object sender, RoutedEventArgs e)
+        {
+            _snapshot = new Dictionary<string, (bool, bool, bool)>();
+            foreach (var item in _cacheList)
+                _snapshot[item.Name] = (item.IsOn, item.IsFrozen, item.IsLocked);
+            TxtStatus.Text = $"已保存 {_snapshot.Count} 个图层的状态快照";
+        }
+
+        private void OnSnapshotLoad(object sender, RoutedEventArgs e)
+        {
+            if (_snapshot == null || _snapshot.Count == 0) { AcadApp.ShowAlertDialog("没有保存的状态快照。"); return; }
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            var curLayerId = doc.Database.Clayer;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                foreach (var kv in _snapshot)
+                {
+                    if (lt != null && lt.Has(kv.Key))
+                    {
+                        var ltr = tr.GetObject(lt[kv.Key], OpenMode.ForWrite) as LayerTableRecord;
+                        if (ltr != null)
+                        {
+                            if (ltr.ObjectId != curLayerId) // 当前图层不能关闭/冻结
+                            {
+                                ltr.IsOff = !kv.Value.on;
+                                ltr.IsFrozen = kv.Value.frozen;
+                            }
+                            ltr.IsLocked = kv.Value.locked;
+                        }
+                    }
+                }
+                tr.Commit();
+            }
+            RefreshLayerList();
+            TxtStatus.Text = $"已恢复 {_snapshot.Count} 个图层的状态";
+        }
+
+        // ── Layer Operations ──
+        private void OnIsolateLayer(object sender, RoutedEventArgs e)
+        {
+            var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Select(x => x.Name).ToHashSet();
+            if (sel.Count == 0) return;
+            var curLayer = _cacheList.FirstOrDefault(x => x.IsCurrent)?.Name ?? "";
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                foreach (ObjectId id in lt!)
+                {
+                    var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null && !ltr.IsErased && ltr.Name != curLayer) ltr.IsOff = !sel.Contains(ltr.Name);
+                }
+                tr.Commit();
+            }
+            RefreshLayerList();
+            TxtStatus.Text = $"已隔离 {sel.Count} 个图层（右键可取消隔离）";
+        }
+
+        private void OnUnIsolate(object sender, RoutedEventArgs e)
+        {
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                foreach (ObjectId id in lt!)
+                {
+                    var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null && !ltr.IsErased) ltr.IsOff = false;
+                }
+                tr.Commit();
+            }
+            RefreshLayerList();
+            TxtStatus.Text = "已取消隔离，全部图层开启";
+        }
+
+        private void OnFreezeOthers(object sender, RoutedEventArgs e)
+        {
+            var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Select(x => x.Name).ToHashSet();
+            if (sel.Count == 0) return;
+            var curLayer = _cacheList.FirstOrDefault(x => x.IsCurrent)?.Name ?? "";
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                foreach (ObjectId id in lt!)
+                {
+                    var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null && !ltr.IsErased && ltr.Name != curLayer)
+                        ltr.IsFrozen = !sel.Contains(ltr.Name);
+                }
+                tr.Commit();
+            }
+            RefreshLayerList();
+        }
+
+        private void OnLockOthers(object sender, RoutedEventArgs e)
+        {
+            var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Select(x => x.Name).ToHashSet();
+            if (sel.Count == 0) return;
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                foreach (ObjectId id in lt!)
+                {
+                    var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null && !ltr.IsErased) ltr.IsLocked = !sel.Contains(ltr.Name);
+                }
+                tr.Commit();
+            }
+            RefreshLayerList();
+        }
+
+        private void OnSelectObjects(object sender, RoutedEventArgs e)
+        {
+            var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Select(x => x.Name).ToHashSet();
+            if (sel.Count == 0) return;
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            try
+            {
+                var ed = doc.Editor;
+                var filter = new SelectionFilter(new[] { new TypedValue((int)DxfCode.LayerName, string.Join(",", sel)) });
+                var psr = ed.SelectAll(filter);
+                if (psr.Status == PromptStatus.OK) ed.SetImpliedSelection(psr.Value);
+            }
+            catch (System.Exception ex) { Logger.Error(ex); AcadApp.ShowAlertDialog($"选择失败: {ex.Message}"); }
+        }
+
+        private void OnMergeLayers(object sender, RoutedEventArgs e)
+        {
+            var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+            if (sel.Count < 1) { AcadApp.ShowAlertDialog("请至少选中 1 个图层。"); return; }
+            var targets = _cacheList.Select(x => x.Name).Where(n => !sel.Any(s => s.Name == n)).OrderBy(x => x).ToList();
+            if (targets.Count == 0) { AcadApp.ShowAlertDialog("没有可用的目标图层。"); return; }
+            string? target = InputDialog.Select("合并图层", "选择目标图层：", targets, targets[0]);
+            if (string.IsNullOrWhiteSpace(target)) return;
+            if (System.Windows.MessageBox.Show($"将把 {sel.Count} 个源图层中的对象迁移到：{target}\n\n注意：该操作会修改块内对象图层，并尝试删除源图层。建议先保存图纸。是否继续？", "CAD助手 - 合并图层确认", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            int moved = 0;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                ObjectId targetId = lt![target];
+                var bt = tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead) as BlockTable;
+                foreach (ObjectId btrId in bt!)
+                {
+                    var btr = tr.GetObject(btrId, OpenMode.ForRead) as BlockTableRecord;
+                    foreach (ObjectId entId in btr!)
+                    {
+                        var ent = tr.GetObject(entId, OpenMode.ForWrite) as Entity;
+                        if (ent != null && sel.Any(s => s.Name == ent.Layer))
+                        { ent.LayerId = targetId; moved++; }
+                    }
+                }
+                foreach (var s in sel)
+                {
+                    if (s.IsCurrent) continue;
+                    try { var ltr = tr.GetObject(lt[s.Name], OpenMode.ForWrite) as LayerTableRecord; ltr?.Erase(); } catch { }
+                }
+                tr.Commit();
+            }
+            RefreshLayerList();
+            TxtStatus.Text = $"已合并 {moved} 个物体到图层 {target}";
+        }
+
+        private void OnBatchRename(object sender, RoutedEventArgs e)
+        {
+            var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+            if (sel.Count < 1) { AcadApp.ShowAlertDialog("请至少选中 1 个图层。"); return; }
+            string? mode = InputDialog.Select("批量改名", "选择改名方式：", new List<string> { "添加前缀", "添加后缀", "查找替换" }, "添加前缀");
+            if (string.IsNullOrWhiteSpace(mode)) return;
+            string? arg = null, arg2 = null;
+            if (mode == "添加前缀") arg = InputDialog.Show("批量改名 - 添加前缀", "输入前缀：");
+            else if (mode == "添加后缀") arg = InputDialog.Show("批量改名 - 添加后缀", "输入后缀：");
+            else { arg = InputDialog.Show("批量改名 - 查找替换", "查找文字："); arg2 = InputDialog.Show("批量改名 - 查找替换", "替换为："); }
+            if (string.IsNullOrWhiteSpace(arg)) return;
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            int renamed = 0;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                foreach (var s in sel)
+                {
+                    string newName = mode switch
+                    {
+                        "添加前缀" => arg + s.Name,
+                        "添加后缀" => s.Name + arg,
+                        "查找替换" => s.Name.Replace(arg ?? "", arg2 ?? ""),
+                        _ => s.Name
+                    };
+                    if (newName != s.Name && lt != null && lt.Has(s.Name) && !lt.Has(newName))
+                    {
+                        var ltr = tr.GetObject(lt[s.Name], OpenMode.ForWrite) as LayerTableRecord;
+                        if (ltr != null) { ltr.Name = newName; renamed++; }
+                    }
+                }
+                tr.Commit();
+            }
+            RefreshLayerList();
+            TxtStatus.Text = $"已重命名 {renamed} 个图层";
+        }
+
+        // ── Batch Edit ──
+        private void OnBatchEdit(object sender, RoutedEventArgs e)
+        {
+            var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+            if (sel.Count < 1) { AcadApp.ShowAlertDialog("请至少选中 1 个图层。"); return; }
+
+            var modes = new List<string> { "颜色", "线型", "线宽", "透明度" };
+            string? mode = InputDialog.Select("批量改属性", "选择属性：", modes, "颜色");
+            if (string.IsNullOrWhiteSpace(mode)) return;
+
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            if (mode == "颜色")
+            {
+                var c = ColorPickerDialog.Show(AcColor.FromColorIndex(ColorMethod.ByAci, sel[0].ColorIndex));
+                if (c == null) return;
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    foreach (var s in sel)
+                        if (lt != null && lt.Has(s.Name))
+                            ((LayerTableRecord)tr.GetObject(lt[s.Name], OpenMode.ForWrite)).Color = c;
+                    tr.Commit();
+                }
+            }
+            else if (mode == "线型")
+            {
+                var linetypes = new List<string>();
+                ObjectId ltId = ObjectId.Null;
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    var ltt = tr.GetObject(doc.Database.LinetypeTableId, OpenMode.ForRead) as LinetypeTable;
+                    foreach (ObjectId id in ltt!) { var rec = tr.GetObject(id, OpenMode.ForRead) as LinetypeTableRecord; if (rec != null) linetypes.Add(rec.Name); }
+                    tr.Commit();
+                }
+                string? lt = InputDialog.Select("批量改属性 - 线型", "选择线型：", linetypes.OrderBy(x => x).ToList(), sel[0].Linetype);
+                if (string.IsNullOrWhiteSpace(lt)) return;
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    var ltt = tr.GetObject(doc.Database.LinetypeTableId, OpenMode.ForRead) as LinetypeTable;
+                    if (ltt != null && ltt.Has(lt))
+                    {
+                        ltId = ltt[lt];
+                        var lt2 = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                        foreach (var s in sel)
+                            if (lt2 != null && lt2.Has(s.Name))
+                                ((LayerTableRecord)tr.GetObject(lt2[s.Name], OpenMode.ForWrite)).LinetypeObjectId = ltId;
+                    }
+                    tr.Commit();
+                }
+            }
+            else if (mode == "透明度")
+            {
+                string? input = InputDialog.Show("批量改属性 - 透明度", "输入 0-90：");
+                if (string.IsNullOrWhiteSpace(input) || !byte.TryParse(input, out byte alpha) || alpha > 90) return;
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    var lt2 = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    foreach (var s in sel)
+                        if (lt2 != null && lt2.Has(s.Name))
+                            ((LayerTableRecord)tr.GetObject(lt2[s.Name], OpenMode.ForWrite)).Transparency = new Autodesk.AutoCAD.Colors.Transparency(alpha);
+                    tr.Commit();
+                }
+            }
+            RefreshLayerList();
+        }
+
+        // ── Lineweight ──
+        private void OnLineweightClick(object s, RoutedEventArgs e)
+        {
+            var i = (s as System.Windows.Controls.Button)?.DataContext as SimpleLayerItem;
+            if (i == null) return;
+            var lwList = new List<string> { "默认", "ByLayer", "ByBlock", "0.00", "0.05", "0.09", "0.13", "0.15", "0.18", "0.20", "0.25", "0.30", "0.35", "0.40", "0.50", "0.53", "0.60", "0.70", "0.80", "0.90", "1.00", "1.06", "1.20", "1.40", "1.58", "2.00", "2.11" };
+            string? sel = InputDialog.Select("修改线宽", "请在下方列表中选择：", lwList, i.LineWeightDisplay);
+            if (string.IsNullOrWhiteSpace(sel)) return;
+            LineWeight lw = sel switch
+            {
+                "ByLayer" => LineWeight.ByLayer,
+                "ByBlock" => LineWeight.ByBlock,
+                "默认" => LineWeight.ByLineWeightDefault,
+                "0.00" => LineWeight.LineWeight000, "0.05" => LineWeight.LineWeight005, "0.09" => LineWeight.LineWeight009,
+                "0.13" => LineWeight.LineWeight013, "0.15" => LineWeight.LineWeight015, "0.18" => LineWeight.LineWeight018,
+                "0.20" => LineWeight.LineWeight020, "0.25" => LineWeight.LineWeight025, "0.30" => LineWeight.LineWeight030,
+                "0.35" => LineWeight.LineWeight035, "0.40" => LineWeight.LineWeight040, "0.50" => LineWeight.LineWeight050,
+                "0.53" => LineWeight.LineWeight053, "0.60" => LineWeight.LineWeight060, "0.70" => LineWeight.LineWeight070,
+                "0.80" => LineWeight.LineWeight080, "0.90" => LineWeight.LineWeight090, "1.00" => LineWeight.LineWeight100,
+                "1.06" => LineWeight.LineWeight106, "1.20" => LineWeight.LineWeight120, "1.40" => LineWeight.LineWeight140,
+                "1.58" => LineWeight.LineWeight158, "2.00" => LineWeight.LineWeight200, "2.11" => LineWeight.LineWeight211,
+                _ => LineWeight.ByLineWeightDefault
+            };
+            ExecuteLayerAction(i.Name, ltr => ltr.LineWeight = lw);
+            RefreshLayerList();
+        }
+
+        // ── Walk ──
+        private int _walkIndex = -1;
+        private void OnWalkPrev(object sender, RoutedEventArgs e) => Walk(-1);
+        private void OnWalkNext(object sender, RoutedEventArgs e) => Walk(1);
+
+        private void Walk(int dir)
+        {
+            var visible = _cacheList.Where(x => !string.IsNullOrEmpty(x.Name)).ToList();
+            if (visible.Count == 0) return;
+            _walkIndex = (_walkIndex + dir + visible.Count) % visible.Count;
+            var target = visible[_walkIndex];
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                foreach (ObjectId id in lt!)
+                {
+                    var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null && !ltr.IsErased) ltr.IsOff = ltr.Name != target.Name;
+                }
+                tr.Commit();
+            }
+            RefreshLayerList();
+            TxtStatus.Text = $"走查: {_walkIndex + 1}/{visible.Count} — {target.Name}";
+        }
+
+        // ── Empty Layer Finder ──
+        private void OnFindEmpty(object sender, RoutedEventArgs e)
+        {
+            AcadApp.ShowAlertDialog("功能已禁用：物体统计功能已移除。");
+        }
+
+        // ── Template ──
+        private void OnSaveTemplate(object sender, RoutedEventArgs e)
+        {
+            string? name = InputDialog.Show("存为模板", "输入模板名称：", System.DateTime.Now.ToString("yyyyMMdd"));
+            if (string.IsNullOrWhiteSpace(name)) return;
+            string dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BS-CAD-Tools", "Templates");
+            System.IO.Directory.CreateDirectory(dir);
+            string path = System.IO.Path.Combine(dir, name + ".json");
+            var template = new LayerTemplateFile
+            {
+                Layers = _cacheList.Select(x => x.Name).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList(),
+                Filters = _filterButtons.Values
+                    .Where(x => !string.IsNullOrWhiteSpace(x.Label))
+                    .Select(x => new LayerFilterTemplate
+                    {
+                        Label = x.Label,
+                        LayerNames = x.LayerNames.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct().ToList()
+                    })
+                    .ToList()
+            };
+            System.IO.File.WriteAllText(path, JsonSerializer.Serialize(template, new JsonSerializerOptions { WriteIndented = true }));
+            TxtStatus.Text = $"模板已保存: {path}";
+        }
+
+        private void OnLoadTemplate(object sender, RoutedEventArgs e)
+        {
+            string dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BS-CAD-Tools", "Templates");
+            System.IO.Directory.CreateDirectory(dir);
+            var files = System.IO.Directory.GetFiles(dir, "*.json")
+                .Concat(System.IO.Directory.GetFiles(dir, "*.txt"))
+                .Select(System.IO.Path.GetFileName)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Cast<string>()
+                .ToList();
+            if (files.Count == 0) { AcadApp.ShowAlertDialog("没有已保存的模板。"); return; }
+            string? name = InputDialog.Select("读取模板", "选择模板：", files, files[0]);
+            if (string.IsNullOrWhiteSpace(name)) return;
+            string path = System.IO.Path.Combine(dir, name);
+            var filters = new List<LayerFilterTemplate>();
+            IEnumerable<string> layerNames;
+            if (System.IO.Path.GetExtension(path).Equals(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                var template = JsonSerializer.Deserialize<LayerTemplateFile>(System.IO.File.ReadAllText(path)) ?? new LayerTemplateFile();
+                layerNames = template.Layers;
+                filters = template.Filters ?? new List<LayerFilterTemplate>();
+            }
+            else
+            {
+                layerNames = System.IO.File.ReadAllLines(path);
+            }
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            int created = 0;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForWrite) as LayerTable;
+                if (lt == null) return;
+                foreach (var nm in layerNames)
+                {
+                    if (lt != null && !lt.Has(nm) && !string.IsNullOrWhiteSpace(nm))
+                    {
+                        var ltr = new LayerTableRecord { Name = nm };
+                        lt.Add(ltr); tr.AddNewlyCreatedDBObject(ltr, true); created++;
+                    }
+                }
+                tr.Commit();
+            }
+            ClearCustomFilters();
+            foreach (var filter in filters)
+                CreateFilterLabel(filter.Label, filter.LayerNames);
+            SetActiveFilterButton(BtnFilterAll);
+            RefreshLayerList();
+            TxtStatus.Text = $"已创建 {created} 个图层";
+        }
+
+        // ── Export ──
+        private void OnExport(object sender, RoutedEventArgs e)
+        {
+            var lines = new List<string> { "名称\t开关\t冻结\t锁定\t颜色\t线型\t线宽\t说明" };
+            foreach (var it in _cacheList)
+                lines.Add($"{it.Name}\t{(it.IsOn ? "开" : "关")}\t{(it.IsFrozen ? "是" : "否")}\t{(it.IsLocked ? "是" : "否")}\t{it.ColorIndex}\t{it.Linetype}\t{it.LineWeightDisplay}\t{it.Description}");
+            string text = string.Join("\n", lines);
+            try { System.Windows.Clipboard.SetText(text); TxtStatus.Text = "已复制图层列表到剪贴板"; } catch { }
+        }
+
+        private void OnNewLayer(object sender, RoutedEventArgs e)
+        {
+            var doc = GetActiveDocument();
+            if (doc == null) return;
+            using (doc.LockDocument())
+            using (var tr = doc.Database.TransactionManager.StartTransaction()) {
+                LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForWrite) as LayerTable;
+                if (lt == null) return;
+                string name = "新图层_1"; int i = 1; while(lt.Has(name)) { i++; name = "新图层_" + i; }
+                LayerTableRecord ltr = new LayerTableRecord { Name = name };
+                lt.Add(ltr); tr.AddNewlyCreatedDBObject(ltr, true);
+                tr.Commit();
+            }
+            RefreshLayerList();
+        }
+    }
+}

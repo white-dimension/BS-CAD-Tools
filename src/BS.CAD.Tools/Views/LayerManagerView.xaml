@@ -1,0 +1,196 @@
+<UserControl x:Class="BS.CAD.Tools.Views.LayerManagerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="800" d:DesignWidth="650">
+
+    <Grid Background="#181A1B">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid.Resources>
+            <Style x:Key="Win11ButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="#242729"/><Setter Property="Foreground" Value="#E7EDF2"/><Setter Property="FontSize" Value="12"/><Setter Property="Padding" Value="12,6"/><Setter Property="BorderBrush" Value="#343A3F"/><Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="10" BorderThickness="{TemplateBinding BorderThickness}" BorderBrush="{TemplateBinding BorderBrush}"
+                                    RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform><ScaleTransform ScaleX="1" ScaleY="1"/></Border.RenderTransform>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#303A42"/><Setter TargetName="border" Property="BorderBrush" Value="#4E5B64"/></Trigger>
+                                <Trigger Property="IsPressed" Value="True"><Setter TargetName="border" Property="RenderTransform"><Setter.Value><ScaleTransform ScaleX="0.94" ScaleY="0.94"/></Setter.Value></Setter></Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="FilterButtonStyle" TargetType="Button" BasedOn="{StaticResource Win11ButtonStyle}">
+                <Setter Property="Padding" Value="16,8"/><Setter Property="Margin" Value="0,0,8,0"/><Setter Property="Background" Value="#242729"/>
+                <Style.Triggers><Trigger Property="Tag" Value="active"><Setter Property="Background" Value="#0A84D6"/><Setter Property="BorderBrush" Value="#0A84D6"/></Trigger></Style.Triggers>
+            </Style>
+
+            <Style x:Key="QuickFilterButtonStyle" TargetType="Button" BasedOn="{StaticResource Win11ButtonStyle}">
+                <Setter Property="Padding" Value="12,6"/><Setter Property="Margin" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="FontSize" Value="11"/>
+                <Style.Triggers><Trigger Property="Tag" Value="active"><Setter Property="Background" Value="#0A84D6"/><Setter Property="BorderBrush" Value="#0A84D6"/></Trigger></Style.Triggers>
+            </Style>
+
+            <Style x:Key="IconButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="BorderThickness" Value="1"/><Setter Property="MinHeight" Value="28"/><Setter Property="Padding" Value="8,3"/><Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Margin="2,2" RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform><ScaleTransform ScaleX="1" ScaleY="1"/></Border.RenderTransform>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#303A42"/><Setter TargetName="border" Property="BorderBrush" Value="#53616B"/></Trigger>
+                                <Trigger Property="IsPressed" Value="True"><Setter TargetName="border" Property="RenderTransform"><Setter.Value><ScaleTransform ScaleX="0.94" ScaleY="0.94"/></Setter.Value></Setter></Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- 极细暗色滚动条 (Chrome 风格) -->
+            <Style TargetType="ScrollBar">
+                <Setter Property="Width" Value="4"/><Setter Property="Height" Value="4"/><Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ScrollBar">
+                            <Grid Background="Transparent" SnapsToDevicePixels="true">
+                                <Track x:Name="PART_Track" IsDirectionReversed="true">
+                                    <Track.Thumb>
+                                        <Thumb>
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="Thumb"><Border Background="#666666" CornerRadius="2"/></ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="ContextMenu"><Setter Property="Background" Value="#242729"/><Setter Property="BorderBrush" Value="#3D454B"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8"><ItemsPresenter Margin="0,6"/></Border></ControlTemplate></Setter.Value></Setter></Style>
+            <Style TargetType="MenuItem"><Setter Property="Foreground" Value="White"/><Setter Property="Padding" Value="10,9"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem"><Border x:Name="itemBorder" Background="Transparent" CornerRadius="5" Margin="5,1"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock x:Name="checkMark" Text="✓" Foreground="#4CAF50" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/><ContentPresenter Grid.Column="1" ContentSource="Header" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/></Grid></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#444444"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="checkMark" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+            <Style TargetType="Separator"><Setter Property="Margin" Value="8,5"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Separator"><Border Height="1" Background="#343A3F"/></ControlTemplate></Setter.Value></Setter></Style>
+
+            <Style x:Key="HeaderStyle" TargetType="DataGridColumnHeader"><Setter Property="Background" Value="#181A1B"/><Setter Property="Foreground" Value="#9DA7AF"/><Setter Property="FontSize" Value="13"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Padding" Value="8,15"/><Setter Property="MinHeight" Value="44"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="ContextMenu" Value="{DynamicResource HeaderContextMenu}"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DataGridColumnHeader"><Grid><Border Background="{TemplateBinding Background}" BorderThickness="0,0,0,1" BorderBrush="#2E3438"><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/></Border><Rectangle HorizontalAlignment="Right" Width="1" Fill="#2E3438" Margin="0,10,0,10"/></Grid></ControlTemplate></Setter.Value></Setter></Style>
+
+            <!-- 恢复你原来的圆角行样式 -->
+            <Style TargetType="DataGridRow">
+                <Setter Property="ContextMenu" Value="{DynamicResource RowContextMenu}"/><Setter Property="Background" Value="{Binding RowBackground}"/><Setter Property="Height" Value="36"/><Setter Property="Margin" Value="6,1"/><Setter Property="SnapsToDevicePixels" Value="True"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="DataGridRow">
+                            <Border x:Name="DGR_Border" Background="{TemplateBinding Background}" CornerRadius="8" BorderThickness="0">
+                                <Grid>
+                                    <Border Width="{Binding CurrentMarkerWidth}" Background="#0A84D6" HorizontalAlignment="Left" CornerRadius="8,0,0,8"/>
+                                    <DataGridCellsPresenter ItemsPanel="{TemplateBinding ItemsPanel}" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="DGR_Border" Property="Background" Value="#242B30"/></Trigger>
+                                <Trigger Property="IsSelected" Value="True"><Setter TargetName="DGR_Border" Property="Background" Value="#303A42"/></Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style TargetType="DataGridCell"><Setter Property="BorderThickness" Value="0"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DataGridCell"><Border Background="Transparent"><ContentPresenter VerticalAlignment="Center"/></Border></ControlTemplate></Setter.Value></Setter></Style>
+
+            <ContextMenu x:Key="HeaderContextMenu" Opened="OnHeaderContextMenuOpened">
+                <MenuItem Header="全部显示" Click="OnShowAllColumns" StaysOpenOnClick="True"/><MenuItem Header="恢复默认" Click="OnRestoreDefaultColumns" StaysOpenOnClick="True"/>
+                <Separator/>
+                <MenuItem Header="状态" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="开关" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="冻结" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="锁定" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="打印" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="颜色" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="线型" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="透明" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="新视口冻结" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="图层名称" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="线宽" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/><MenuItem Header="说明" IsCheckable="True" StaysOpenOnClick="True" Click="OnColumnVisibilityToggle"/>
+            </ContextMenu>
+
+            <ContextMenu x:Key="RowContextMenu" Opened="OnRowContextMenuOpened">
+                <MenuItem x:Name="MiSetCurrent" Header="设为当前图层" Click="OnSetCurrent"/><MenuItem x:Name="MiRenameLayer" Header="重命名 / 说明" Click="OnRenameLayer"/><MenuItem Header="删除选中图层" Click="OnDeleteLayer"/>
+                <Separator x:Name="SepSingleActions"/>
+                <MenuItem Header="隔离图层" Click="OnIsolateLayer"/><MenuItem Header="取消隔离" Click="OnUnIsolate"/><MenuItem Header="冻结其他" Click="OnFreezeOthers"/><MenuItem Header="锁定其他" Click="OnLockOthers"/>
+                <Separator/>
+                <MenuItem Header="+ 添加为过滤标签" Click="OnAddFilterFromSelection"/>
+                <Separator/>
+                <MenuItem Header="合并图层到..." Click="OnMergeLayers"/>
+            </ContextMenu>
+        </Grid.Resources>
+
+        <Border Grid.Row="0" Background="#1D2022" BorderBrush="#2E3438" BorderThickness="0,0,0,1" Padding="10,10,10,8">
+        <WrapPanel x:Name="ToolbarPanel">
+            <Button x:Name="BtnNewLayer" Content="新建" Height="34" MinWidth="62" Style="{StaticResource Win11ButtonStyle}" Click="OnNewLayer" Margin="2"/><Button x:Name="BtnSetCurrent" Content="当前" Height="34" MinWidth="62" Style="{StaticResource Win11ButtonStyle}" Click="OnSetCurrent" Margin="2"/><Button x:Name="BtnDeleteLayer" Content="删除" Height="34" MinWidth="62" Style="{StaticResource Win11ButtonStyle}" Click="OnDeleteLayer" Margin="2"/><Button x:Name="BtnRefresh" Content="刷新" Height="34" MinWidth="62" Style="{StaticResource Win11ButtonStyle}" Click="OnRefreshManual" Margin="2"/><Button x:Name="BtnSettings" Content="设置" Height="34" MinWidth="62" Style="{StaticResource Win11ButtonStyle}" Click="OnToggleSettings" Margin="2"/><Button x:Name="BtnSnapshotSave" Content="存状态" Height="30" MinWidth="70" Style="{StaticResource Win11ButtonStyle}" Click="OnSnapshotSave" Margin="2"/><Button x:Name="BtnSnapshotLoad" Content="读状态" Height="30" MinWidth="70" Style="{StaticResource Win11ButtonStyle}" Click="OnSnapshotLoad" Margin="2"/><Button x:Name="BtnSaveTemplate" Content="存模板" Height="30" MinWidth="70" Style="{StaticResource Win11ButtonStyle}" Click="OnSaveTemplate" Margin="2"/><Button x:Name="BtnLoadTemplate" Content="读模板" Height="30" MinWidth="70" Style="{StaticResource Win11ButtonStyle}" Click="OnLoadTemplate" Margin="2"/><Button x:Name="BtnExport" Content="导出" Height="30" MinWidth="62" Style="{StaticResource Win11ButtonStyle}" Click="OnExport" Margin="2"/>
+        </WrapPanel>
+        </Border>
+
+        <Border Grid.Row="1" Background="#242729" CornerRadius="8" Margin="13,10,13,8" Padding="12,2" BorderBrush="#343A3F" BorderThickness="1">
+            <Grid>
+                <TextBlock Text="搜索" Foreground="#6F7A83" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="2,0,0,0" IsHitTestVisible="False"/>
+                <TextBox x:Name="TxtSearch" Background="Transparent" BorderThickness="0" Foreground="#E7EDF2" TextChanged="OnSearchChanged" GotFocus="OnSearchGotFocus" CaretBrush="#E7EDF2" VerticalContentAlignment="Center" FontSize="13" Height="34" Padding="36,0,0,0"/>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Background="#202326" BorderBrush="#2E3438" BorderThickness="1" CornerRadius="8" Margin="10,2,10,4" Padding="6">
+        <DockPanel LastChildFill="True">
+            <TextBlock Text="&#x56FE;&#x5C42;&#x5F00;&#x5173;&#x8FC7;&#x6EE4;" Foreground="#8F9AA3" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,0,10,0"/>
+        <StackPanel x:Name="StackQuickFilters" Orientation="Horizontal">
+            <Button Content="全部" CommandParameter="All" Click="OnQuickFilterClick" Style="{StaticResource QuickFilterButtonStyle}" Tag="active"/><Button Content="开启" CommandParameter="On" Click="OnQuickFilterClick" Style="{StaticResource QuickFilterButtonStyle}"/><Button Content="关闭" CommandParameter="Off" Click="OnQuickFilterClick" Style="{StaticResource QuickFilterButtonStyle}"/><Button Content="冻结" CommandParameter="Frozen" Click="OnQuickFilterClick" Style="{StaticResource QuickFilterButtonStyle}"/><Button Content="锁定" CommandParameter="Locked" Click="OnQuickFilterClick" Style="{StaticResource QuickFilterButtonStyle}"/><Button Content="当前" CommandParameter="Current" Click="OnQuickFilterClick" Style="{StaticResource QuickFilterButtonStyle}"/>
+        </StackPanel>
+        </DockPanel>
+        </Border>
+
+        <DockPanel Grid.Row="3" Margin="10,4,10,6" LastChildFill="True">
+            <TextBlock Text="&#x81EA;&#x5B9A;&#x4E49;&#x8FC7;&#x6EE4;" Foreground="#8F9AA3" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,0,10,0"/>
+        <StackPanel x:Name="StackFilters" Orientation="Horizontal">
+            <Button x:Name="BtnFilterAll" Content="全部" Click="OnFilterLabelClick" Style="{StaticResource FilterButtonStyle}" Tag="active"/>
+        </StackPanel>
+        </DockPanel>
+
+        <Border Grid.Row="4" Height="1" Background="#2E3438" Margin="10,5"/>
+
+        <!-- 列表：缩小列宽，启用横向滚动 -->
+        <DataGrid Grid.Row="5" x:Name="GridLayers" AutoGenerateColumns="False" CanUserAddRows="False" Background="Transparent" Foreground="#E7EDF2" BorderThickness="0" SelectionMode="Extended" GridLinesVisibility="None" RowHeaderWidth="0" MouseDoubleClick="OnGridDoubleClick" HeadersVisibility="Column" ColumnHeaderStyle="{StaticResource HeaderStyle}" CanUserResizeColumns="True" KeyDown="OnGridKeyDown" CellEditEnding="OnGridCellEditEnding" SelectionChanged="OnGridSelectionChanged" PreviewMouseRightButtonDown="OnGridPreviewMouseRightButtonDown" MouseRightButtonDown="OnGridPreviewMouseRightButtonDown" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="状态" Width="40"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="✔" Foreground="#4CAF50" HorizontalAlignment="Center" Visibility="{Binding IsCurrentVisibility}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="开关" Width="45"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Style="{StaticResource IconButtonStyle}" Click="OnToggleStatus" Tag="On"><TextBlock Text="💡" Opacity="{Binding IsOnOpacity}" Foreground="White" FontSize="15" HorizontalAlignment="Center"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="冻结" Width="45"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Style="{StaticResource IconButtonStyle}" Click="OnToggleStatus" Tag="Freeze"><TextBlock Text="❄️" Opacity="{Binding IsFrozenOpacity}" Foreground="White" FontSize="15" HorizontalAlignment="Center"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="锁定" Width="45"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Style="{StaticResource IconButtonStyle}" Click="OnToggleStatus" Tag="Lock"><TextBlock Text="🔒" Opacity="{Binding IsLockedOpacity}" Foreground="White" FontSize="15" HorizontalAlignment="Center"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="打印" Width="45"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Style="{StaticResource IconButtonStyle}" Click="OnToggleStatus" Tag="Plot"><TextBlock Text="🖨️" Opacity="{Binding IsPlottableOpacity}" Foreground="White" FontSize="14" HorizontalAlignment="Center"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="颜色" Width="70"><DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="8,0"><Button Width="18" Height="18" Background="{Binding ColorBrush}" BorderThickness="0" Click="OnColorClick" Margin="0,0,6,0"><Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources></Button><TextBlock Text="{Binding ColorIndex}" Foreground="#888888" FontSize="11" VerticalAlignment="Center"/></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="线型" Width="108"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Style="{StaticResource IconButtonStyle}" Click="OnLinetypeClick" MinWidth="92"><TextBlock Text="{Binding Linetype}" Foreground="White" FontSize="11" HorizontalAlignment="Center"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="透明" Width="50"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Style="{StaticResource IconButtonStyle}" Click="OnTransparencyClick"><TextBlock Text="{Binding TransparencyDisplay}" Foreground="#AAAAAA" FontSize="11" HorizontalAlignment="Center"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="新视口冻结" Width="80"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Style="{StaticResource IconButtonStyle}" Click="OnToggleStatus" Tag="VPFreeze"><TextBlock Text="🧊" Opacity="{Binding IsVPFrozenOpacity}" Foreground="White" FontSize="14" HorizontalAlignment="Center"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTextColumn Header="图层名称" Binding="{Binding Name}" Width="160" IsReadOnly="True"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="{Binding NameWeight}"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Margin" Value="10,0"/></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn>
+                <DataGridTemplateColumn Header="线宽" Width="72"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Style="{StaticResource IconButtonStyle}" Click="OnLineweightClick" MinWidth="58"><TextBlock Text="{Binding LineWeightDisplay}" Foreground="#AAAAAA" FontSize="11" HorizontalAlignment="Center"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                <DataGridTextColumn Header="说明" Binding="{Binding Description, UpdateSourceTrigger=LostFocus}" Width="*"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#888888"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Margin" Value="10,0"/></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid x:Name="GridSettings" Grid.Row="0" Grid.RowSpan="7" Background="#CC1E1E1E" Visibility="Collapsed">
+            <Border Background="#242424" CornerRadius="12" Margin="42" BorderBrush="#464D52" BorderThickness="1" VerticalAlignment="Center" MaxWidth="560">
+                <StackPanel Margin="32">
+                    <Grid Margin="0,0,0,18">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="界面设置" Foreground="White" FontSize="20" FontWeight="SemiBold"/>
+                            <TextBlock Text="选择顶部工具栏显示哪些按钮" Foreground="#8F9AA3" FontSize="12" Margin="0,8,0,0"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="关闭" Width="72" Height="32" Style="{StaticResource Win11ButtonStyle}" Click="OnToggleSettings" Background="#333333"/>
+                    </Grid>
+                    <WrapPanel x:Name="SettingsStack" Orientation="Horizontal" Margin="0,0,0,22"/>
+                    <Button Content="完成" Height="40" Style="{StaticResource Win11ButtonStyle}" Click="OnToggleSettings" Background="#0078D4" BorderBrush="#0078D4"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="6" Background="#151718" BorderBrush="#2E3438" BorderThickness="0,1,0,0" Padding="12,7"><TextBlock x:Name="TxtStatus" Text="Ready" Foreground="#8F9AA3" FontSize="10"/></Border>
+    </Grid>
+</UserControl>

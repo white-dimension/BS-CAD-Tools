@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0" AutodeskProduct="AutoCAD" ProductType="Application" Name="BS-CAD-Tools" Description="BS CAD Tools" AppVersion="0.1.0">
+  <CompanyDetails Name="White Dimension" />
+  <Components>
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD" SeriesMin="R26.0" SeriesMax="R26.0" />
+    <ComponentEntry AppName="BS-CAD-Tools"
+                    AppDescription="AutoCAD designer assistant tools"
+                    ModuleName="./Contents/BS.CAD.Tools.dll"
+                    LoadOnAutoCADStartup="True"
+                    LoadOnCommandInvocation="True">
+      <Commands GroupName="BS-CAD-Tools">
+        <Command Global="ShowPanel" Local="ShowPanel" />
+        <Command Global="LY" Local="LY" />
+        <Command Global="FIXFONTS" Local="FIXFONTS" />
+        <Command Global="TS" Local="TS" />
+        <Command Global="BZ" Local="BZ" />
+        <Command Global="SETBYLAYER" Local="SETBYLAYER" />
+      </Commands>
+    </ComponentEntry>
+  </Components>
+</ApplicationPackage>

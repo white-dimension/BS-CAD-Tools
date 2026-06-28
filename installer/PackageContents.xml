@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0"
+                    AutodeskProduct="AutoCAD"
+                    ProductType="Application"
+                    Name="BS-CAD-Tools"
+                    Description="AutoCAD 设计师辅助插件 — 图层管理器、字体修复、ByLayer 修复、输入法自动切换"
+                    AppVersion="5.3.0">
+  <CompanyDetails Name="White Dimension" />
+  <Components>
+    <RuntimeRequirements OS="Win64"
+                         Platform="AutoCAD"
+                         SeriesMin="R26.0"
+                         SeriesMax="R26.0" />
+    <ComponentEntry AppName="BS-CAD-Tools"
+                    AppDescription="AutoCAD designer assistant tools"
+                    ModuleName="./Contents/BS.CAD.Tools.dll"
+                    LoadOnAutoCADStartup="True"
+                    LoadOnCommandInvocation="True">
+      <Commands GroupName="BS-CAD-Tools">
+        <Command Global="ShowPanel" Local="ShowPanel" />
+        <Command Global="LY" Local="LY" />
+        <Command Global="FIXFONTS" Local="FIXFONTS" />
+        <Command Global="TS" Local="TS" />
+        <Command Global="BZ" Local="BZ" />
+        <Command Global="SETBYLAYER" Local="SETBYLAYER" />
+      </Commands>
+    </ComponentEntry>
+  </Components>
+</ApplicationPackage>

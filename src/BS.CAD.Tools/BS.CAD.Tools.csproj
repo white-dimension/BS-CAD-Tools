@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>BS.CAD.Tools</RootNamespace>
+    <AssemblyName>BS.CAD.Tools</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoCAD.NET" Version="26.0.0" />
+    <PackageReference Include="AutoCAD.NET.Core" Version="26.0.0" />
+    <PackageReference Include="AutoCAD.NET.Model" Version="26.0.0" />
+  </ItemGroup>
+
+</Project>
