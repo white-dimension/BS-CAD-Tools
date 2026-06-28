@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Drawing.Text;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -11,6 +13,7 @@ using Autodesk.AutoCAD.DatabaseServices;
 using BS.CAD.Tools.Models;
 using BS.CAD.Tools.Services;
 using BS.CAD.Tools.Utils;
+using Microsoft.Win32;
 using WinForms = System.Windows.Forms;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
@@ -20,6 +23,9 @@ namespace BS.CAD.Tools.Views
     {
         private readonly DispatcherTimer _timer;
         private readonly SettingsService _settingsService = new();
+
+        [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
+        private static extern uint ImmGetDescription(IntPtr hKL, StringBuilder lpszDescription, uint uBufLen);
 
         public MainPanelView()
         {
@@ -161,6 +167,7 @@ namespace BS.CAD.Tools.Views
             }
         }
 
+
         private void LoadInstalledInputLanguages()
         {
             try
@@ -171,14 +178,15 @@ namespace BS.CAD.Tools.Views
                 ComboEnglishIME.IsEnabled = true;
 
                 var settings = _settingsService.Load();
+
                 var preferredChineseList = new List<InputLanguageItem>();
-                var fallbackChineseList = new List<InputLanguageItem>();
+                var secondaryChineseList = new List<InputLanguageItem>();
+                var keyboardFallbackChineseList = new List<InputLanguageItem>();
                 var preferredEnglishList = new List<InputLanguageItem>();
                 var fallbackEnglishList = new List<InputLanguageItem>();
 
                 foreach (WinForms.InputLanguage lang in WinForms.InputLanguage.InstalledInputLanguages)
                 {
-                    string iso = lang.Culture.TwoLetterISOLanguageName ?? string.Empty;
                     var item = new InputLanguageItem
                     {
                         DisplayName = GetInputLanguageDisplayName(lang),
@@ -187,39 +195,54 @@ namespace BS.CAD.Tools.Views
                         Handle = lang.Handle
                     };
 
+                    string iso = lang.Culture.TwoLetterISOLanguageName ?? string.Empty;
+
+                    if (IsPreferredChineseIme(lang))
+                    {
+                        preferredChineseList.Add(item);
+                        continue;
+                    }
+
                     if (string.Equals(iso, "zh", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (IsLikelyChineseIme(lang))
+                        if (IsKeyboardLayoutOnly(lang))
                         {
-                            preferredChineseList.Add(item);
+                            keyboardFallbackChineseList.Add(item);
                         }
                         else
                         {
-                            fallbackChineseList.Add(item);
+                            secondaryChineseList.Add(item);
                         }
+
+                        continue;
+                    }
+
+                    if (IsLikelyEnglishKeyboard(lang))
+                    {
+                        preferredEnglishList.Add(item);
                     }
                     else if (string.Equals(iso, "en", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (IsLikelyEnglishKeyboard(lang))
-                        {
-                            preferredEnglishList.Add(item);
-                        }
-                        else
-                        {
-                            fallbackEnglishList.Add(item);
-                        }
+                        fallbackEnglishList.Add(item);
                     }
                 }
 
-                var chineseList = preferredChineseList.Count > 0 ? preferredChineseList : fallbackChineseList;
-                var englishList = preferredEnglishList.Count > 0 ? preferredEnglishList : fallbackEnglishList;
+                var chineseList = preferredChineseList.Count > 0
+                    ? preferredChineseList
+                    : secondaryChineseList.Count > 0
+                        ? secondaryChineseList
+                        : keyboardFallbackChineseList;
 
-                foreach (var item in chineseList.DistinctBy(x => x.HklHex))
+                var englishList = preferredEnglishList.Count > 0
+                    ? preferredEnglishList
+                    : fallbackEnglishList;
+
+                foreach (var item in UniqueByHandle(chineseList))
                 {
                     ComboChineseIME.Items.Add(item);
                 }
 
-                foreach (var item in englishList.DistinctBy(x => x.HklHex))
+                foreach (var item in UniqueByHandle(englishList))
                 {
                     ComboEnglishIME.Items.Add(item);
                 }
@@ -233,6 +256,10 @@ namespace BS.CAD.Tools.Views
                     ComboChineseIME.Items.Add("未检测到中文输入法");
                     ComboChineseIME.SelectedIndex = 0;
                 }
+                else if (preferredChineseList.Count == 0)
+                {
+                    SetStatus("未检测到微信/搜狗/百度/Rime/拼音等真实中文输入法，已使用中文键盘布局兜底。", true);
+                }
 
                 if (ComboEnglishIME.Items.Count == 0)
                 {
@@ -242,7 +269,15 @@ namespace BS.CAD.Tools.Views
                 }
 
                 UpdateCurrentIMEDisplay();
-                SetStatus($"输入法检测完成：中文 {ComboChineseIME.Items.Count} 个，英文 {ComboEnglishIME.Items.Count} 个。", ComboChineseIME.Items.Count == 0 || ComboEnglishIME.Items.Count == 0);
+
+                if (preferredChineseList.Count > 0 && ComboEnglishIME.Items.Count > 0)
+                {
+                    SetStatus($"输入法检测完成：中文输入法 {ComboChineseIME.Items.Count} 个，英文键盘 {ComboEnglishIME.Items.Count} 个。");
+                }
+                else if (ComboEnglishIME.Items.Count == 0)
+                {
+                    SetStatus("未检测到英文键盘，请在 Windows 语言设置中添加英语/美式键盘。", true);
+                }
             }
             catch (Exception ex)
             {
@@ -340,9 +375,36 @@ namespace BS.CAD.Tools.Views
 
         private static string GetInputLanguageDisplayName(WinForms.InputLanguage lang)
         {
-            if (!string.IsNullOrWhiteSpace(lang.LayoutName))
+            string layoutName = lang.LayoutName?.Trim() ?? string.Empty;
+            string imeDescription = GetImeDescription(lang.Handle);
+            string registryName = GetKeyboardLayoutText(lang.Handle);
+
+            if (!string.IsNullOrWhiteSpace(imeDescription))
             {
-                return lang.LayoutName;
+                if (!string.IsNullOrWhiteSpace(layoutName)
+                    && !string.Equals(imeDescription, layoutName, StringComparison.OrdinalIgnoreCase)
+                    && !layoutName.Contains(imeDescription, StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"{imeDescription} ({layoutName})";
+                }
+
+                return imeDescription;
+            }
+
+            if (!string.IsNullOrWhiteSpace(registryName)
+                && !string.Equals(registryName, layoutName, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(layoutName))
+                {
+                    return $"{registryName} ({layoutName})";
+                }
+
+                return registryName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(layoutName))
+            {
+                return layoutName;
             }
 
             if (!string.IsNullOrWhiteSpace(lang.Culture.DisplayName))
@@ -358,44 +420,148 @@ namespace BS.CAD.Tools.Views
             return "未知输入法";
         }
 
-        private static bool IsLikelyChineseIme(WinForms.InputLanguage lang)
+        private static string GetImeDescription(IntPtr handle)
         {
-            string name = GetInputLanguageDisplayName(lang).Trim();
+            try
+            {
+                var buffer = new StringBuilder(256);
+                uint length = ImmGetDescription(handle, buffer, (uint)buffer.Capacity);
+                return length > 0 ? buffer.ToString().Trim() : string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static string GetKeyboardLayoutText(IntPtr handle)
+        {
+            try
+            {
+                string layoutId = (handle.ToInt64() & 0xFFFFFFFF).ToString("X8");
+                using RegistryKey? key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Control\Keyboard Layouts\{layoutId}");
+                return (key?.GetValue("Layout Text") as string)?.Trim() ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+
+        private static IEnumerable<InputLanguageItem> UniqueByHandle(IEnumerable<InputLanguageItem> items)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in items)
+            {
+                if (seen.Add(item.HklHex))
+                {
+                    yield return item;
+                }
+            }
+        }
+
+        private static bool IsPreferredChineseIme(WinForms.InputLanguage lang)
+        {
+            string name = BuildInputLanguageSearchText(lang);
             if (string.IsNullOrWhiteSpace(name))
             {
                 return false;
             }
 
-            string lower = name.ToLowerInvariant();
-
-            string[] imeKeywords =
+            string[] chineseImeKeywords =
             {
-                "拼音", "双拼", "五笔", "郑码", "仓颉", "速成", "注音", "输入法", "搜狗", "微软", "qq", "微信", "小鹤"
+                "微信", "wechat", "weixin",
+                "搜狗", "sogou",
+                "百度", "baidu",
+                "微软拼音", "microsoft pinyin", "ms pinyin",
+                "拼音", "pinyin",
+                "双拼", "五笔", "wubi",
+                "qq拼音", "qq input", "qq",
+                "手心", "小鹤", "自然码", "紫光", "谷歌拼音", "google pinyin",
+                "rime", "小狼毫", "weasel", "中州韵", "ibus-rime",
+                "仓颉", "cangjie", "速成", "quick", "注音", "zhuyin", "bopomofo",
+                "输入法", "ime", "input method"
             };
 
-            if (imeKeywords.Any(keyword => lower.Contains(keyword.ToLowerInvariant())))
+            if (!chineseImeKeywords.Any(keyword => name.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
             {
-                return true;
+                return false;
             }
 
-            string[] keyboardKeywords =
+            return !IsKeyboardLayoutOnly(lang) || ContainsStrongChineseImeBrand(name);
+        }
+
+        private static bool ContainsStrongChineseImeBrand(string searchText)
+        {
+            string[] strongBrands =
             {
-                "美式键盘", "keyboard", "us", "abc", "键盘"
+                "微信", "wechat", "weixin",
+                "搜狗", "sogou",
+                "百度", "baidu",
+                "微软拼音", "microsoft pinyin",
+                "拼音", "pinyin",
+                "双拼", "五笔", "wubi",
+                "rime", "小狼毫", "weasel",
+                "qq拼音", "手心", "小鹤", "自然码"
             };
 
-            return !keyboardKeywords.Any(keyword => lower.Contains(keyword));
+            return strongBrands.Any(keyword => searchText.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsKeyboardLayoutOnly(WinForms.InputLanguage lang)
+        {
+            string name = BuildInputLanguageSearchText(lang);
+
+            string[] keyboardOnlyKeywords =
+            {
+                "中文(简体) - 美式键盘",
+                "中文(繁体) - 美式键盘",
+                "chinese (simplified) - us keyboard",
+                "chinese (traditional) - us keyboard",
+                "美式键盘",
+                "us keyboard",
+                "united states",
+                "keyboard",
+                "abc",
+                "dvorak"
+            };
+
+            return keyboardOnlyKeywords.Any(keyword => name.Contains(keyword, StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsLikelyEnglishKeyboard(WinForms.InputLanguage lang)
         {
-            string name = GetInputLanguageDisplayName(lang).Trim();
-            if (string.IsNullOrWhiteSpace(name))
+            string iso = lang.Culture.TwoLetterISOLanguageName ?? string.Empty;
+            string name = BuildInputLanguageSearchText(lang);
+
+            if (!string.Equals(iso, "en", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
 
-            string lower = name.ToLowerInvariant();
-            return lower.Contains("keyboard") || lower.Contains("us") || lower.Contains("美式") || lower.Contains("英语");
+            string[] englishKeyboardKeywords =
+            {
+                "美式键盘",
+                "us keyboard",
+                "united states",
+                "english",
+                "英语",
+                "keyboard",
+                "abc"
+            };
+
+            return englishKeyboardKeywords.Any(keyword => name.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                   || !IsPreferredChineseIme(lang);
+        }
+
+        private static string BuildInputLanguageSearchText(WinForms.InputLanguage lang)
+        {
+            return string.Join(" ",
+                lang.LayoutName ?? string.Empty,
+                lang.Culture.DisplayName ?? string.Empty,
+                lang.Culture.EnglishName ?? string.Empty,
+                lang.Culture.Name ?? string.Empty).Trim();
         }
 
         private void OnBtnLayerManagerClick(object sender, RoutedEventArgs e)

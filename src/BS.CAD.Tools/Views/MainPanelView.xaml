@@ -22,38 +22,38 @@
 
         <Style x:Key="PageTitleStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
-            <Setter Property="FontSize" Value="24"/>
+            <Setter Property="FontSize" Value="20"/>
             <Setter Property="FontWeight" Value="Bold"/>
         </Style>
 
         <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
-            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
 
         <Style x:Key="HintTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextSub}"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="LineHeight" Value="18"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="LineHeight" Value="16"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
         </Style>
 
         <Style x:Key="LabelTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextSub}"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
 
         <Style x:Key="CardStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource CardBg}"/>
             <Setter Property="BorderBrush" Value="{StaticResource CardBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="14"/>
-            <Setter Property="Padding" Value="14"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
         </Style>
 
@@ -62,19 +62,19 @@
             <Setter Property="BorderBrush" Value="#405066"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="999"/>
-            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Padding" Value="8,3"/>
         </Style>
 
         <Style x:Key="ToolButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="40"/>
+            <Setter Property="Height" Value="34"/>
             <Setter Property="Margin" Value="0,6,0,0"/>
-            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="Padding" Value="12,0"/>
             <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
             <Setter Property="Background" Value="#2A3038"/>
             <Setter Property="BorderBrush" Value="#434C56"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -83,7 +83,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10"
+                                CornerRadius="8"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -120,8 +120,8 @@
         </Style>
 
         <Style x:Key="GhostButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolButtonStyle}">
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="10,0"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Background" Value="#20262D"/>
             <Setter Property="BorderBrush" Value="#3D4650"/>
@@ -152,9 +152,51 @@
             </Setter>
         </Style>
 
+        <Style x:Key="DarkScrollBarThumbStyle" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="#4A5563"
+                                BorderBrush="#687484"
+                                BorderThickness="1"
+                                CornerRadius="4"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkComboScrollBarStyle" TargetType="ScrollBar">
+            <Setter Property="Width" Value="13"/>
+            <Setter Property="Background" Value="#151B22"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="{TemplateBinding Background}">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True" Margin="2">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand"
+                                                  Opacity="0"
+                                                  Focusable="False"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource DarkScrollBarThumbStyle}"/>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand"
+                                                  Opacity="0"
+                                                  Focusable="False"/>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="DarkPickerComboStyle" TargetType="ComboBox">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
             <Setter Property="Background" Value="#14191F"/>
             <Setter Property="BorderBrush" Value="#38424D"/>
@@ -169,8 +211,8 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="10"/>
-                            <ContentPresenter Margin="12,0,44,0"
+                                    CornerRadius="8"/>
+                            <ContentPresenter Margin="10,0,38,0"
                                               VerticalAlignment="Center"
                                               HorizontalAlignment="Left"
                                               Content="{TemplateBinding SelectionBoxItem}"
@@ -178,7 +220,7 @@
                                               ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
                             <Border Width="34"
                                     HorizontalAlignment="Right"
-                                    CornerRadius="0,10,10,0"
+                                    CornerRadius="0,8,8,0"
                                     Background="#1D2430"
                                     BorderBrush="#38424D"
                                     BorderThickness="1,0,0,0">
@@ -188,12 +230,16 @@
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"/>
                             </Border>
-                            <ToggleButton Background="Transparent"
-                                          BorderThickness="0"
-                                          HorizontalAlignment="Stretch"
+                            <ToggleButton HorizontalAlignment="Stretch"
                                           VerticalAlignment="Stretch"
                                           Focusable="False"
-                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent"/>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
                             <Popup x:Name="Popup"
                                    Placement="Bottom"
                                    AllowsTransparency="True"
@@ -208,6 +254,9 @@
                                         BorderThickness="1"
                                         CornerRadius="10">
                                     <ScrollViewer SnapsToDevicePixels="True">
+                                        <ScrollViewer.Resources>
+                                            <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkComboScrollBarStyle}"/>
+                                        </ScrollViewer.Resources>
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
                                 </Border>
@@ -229,21 +278,196 @@
             </Setter>
         </Style>
 
+
+        <Style x:Key="DarkEditableComboStyle" TargetType="ComboBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+            <Setter Property="Background" Value="#14191F"/>
+            <Setter Property="BorderBrush" Value="#38424D"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboItemStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="OuterBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8"/>
+                            <TextBox x:Name="PART_EditableTextBox"
+                                     Margin="10,0,38,0"
+                                     VerticalAlignment="Center"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{StaticResource TextMain}"
+                                     CaretBrush="{StaticResource TextMain}"
+                                     SelectionBrush="#4E7FD0"
+                                     FontSize="{TemplateBinding FontSize}"
+                                     IsReadOnly="{TemplateBinding IsReadOnly}"/>
+                            <ContentPresenter x:Name="ContentSite"
+                                              Margin="10,0,38,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
+                            <Border Width="34"
+                                    HorizontalAlignment="Right"
+                                    CornerRadius="0,8,8,0"
+                                    Background="#1D2430"
+                                    BorderBrush="#38424D"
+                                    BorderThickness="1,0,0,0">
+                                <TextBlock Text="▼"
+                                           FontSize="10"
+                                           Foreground="{StaticResource TextSub}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <ToggleButton HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Stretch"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent"/>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   PopupAnimation="Slide">
+                                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="260"
+                                        Margin="0,4,0,0"
+                                        Background="#12171D"
+                                        BorderBrush="#38424D"
+                                        BorderThickness="1"
+                                        CornerRadius="10">
+                                    <ScrollViewer SnapsToDevicePixels="True">
+                                        <ScrollViewer.Resources>
+                                            <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkComboScrollBarStyle}"/>
+                                        </ScrollViewer.Resources>
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEditable" Value="True">
+                                <Setter TargetName="ContentSite" Property="Visibility" Value="Hidden"/>
+                            </Trigger>
+                            <Trigger Property="IsEditable" Value="False">
+                                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Hidden"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="OuterBorder" Property="BorderBrush" Value="#4A5A6D"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="OuterBorder" Property="BorderBrush" Value="#5A91FF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="OuterBorder" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="ComboBox">
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
             <Setter Property="Padding" Value="8,0"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Foreground" Value="#111417"/>
         </Style>
 
-        <Style x:Key="ModuleExpanderStyle" TargetType="Expander">
-            <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+
+        <Style x:Key="ModuleCardStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource CardBg}"/>
             <Setter Property="BorderBrush" Value="{StaticResource CardBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
-            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style x:Key="ModuleContentFrameStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBg}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CardBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Margin" Value="8,0,8,8"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style x:Key="ModuleHeaderToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="HeaderBg"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="12,12,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="42"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="18"
+                                        Height="18"
+                                        Margin="16,0,8,0"
+                                        Background="#F6F8FA"
+                                        CornerRadius="9"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center">
+                                    <Path x:Name="Arrow"
+                                          Width="8"
+                                          Height="5"
+                                          Stretch="Fill"
+                                          Fill="#1D2228"
+                                          Data="M 0 5 L 4 0 L 8 5"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          RenderTransformOrigin="0.5,0.5"/>
+                                </Border>
+                                <ContentPresenter Grid.Column="1"
+                                                  Margin="0,0,10,0"
+                                                  VerticalAlignment="Center"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  RecognizesAccessKey="True"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter TargetName="Arrow" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <RotateTransform Angle="180"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HeaderBg" Property="Background" Value="#20262D"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </UserControl.Resources>
 
@@ -254,9 +478,12 @@
         </Grid.RowDefinitions>
 
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="14,14,14,18">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkComboScrollBarStyle}"/>
+            </ScrollViewer.Resources>
+            <StackPanel Margin="10,10,10,12">
 
-                <Border CornerRadius="18" Padding="18,16" Margin="0,0,0,14">
+                <Border CornerRadius="12" Padding="14,10" Margin="0,0,0,10">
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                             <GradientStop Color="#202833" Offset="0"/>
@@ -283,12 +510,12 @@
                             <TextBlock Text="BS-CAD-Tools · 日常绘图工具箱"
                                        FontSize="12"
                                        Foreground="{StaticResource TextSub}"
-                                       Margin="0,6,0,0"/>
+                                        Margin="0,3,0,0"/>
                         </StackPanel>
 
                         <Button Grid.Column="1"
                                 Content="模块设置"
-                                MinWidth="84"
+                                MinWidth="76"
                                 Style="{StaticResource GhostButtonStyle}"
                                 Click="OnBtnModuleSettingsClick"
                                 ToolTip="启用或隐藏主面板功能模块。"/>
@@ -297,14 +524,14 @@
 
                 <Border Style="{StaticResource CardStyle}" Background="#1A2027">
                     <DockPanel LastChildFill="True">
-                        <Border DockPanel.Dock="Right" Style="{StaticResource BadgeStyle}">
+                        <Border DockPanel.Dock="Right" Style="{StaticResource BadgeStyle}" Visibility="Collapsed">
                             <TextBlock Text="IME" Foreground="#AFCBFF" FontSize="11" FontWeight="SemiBold"/>
                         </Border>
-                        <StackPanel Margin="0,0,12,0">
+                        <StackPanel>
                             <TextBlock Text="当前状态" Style="{StaticResource SectionTitleStyle}"/>
                             <TextBlock x:Name="TxtCurrentIME"
                                        Text="输入法监测中..."
-                                       FontSize="13"
+                                       FontSize="12"
                                        Foreground="{StaticResource Warn}"
                                        FontWeight="SemiBold"
                                        TextWrapping="Wrap"/>
@@ -327,38 +554,41 @@
                     </StackPanel>
                 </Border>
 
-                <Expander x:Name="ImeToolsPanel" Header="自动切换输入法" IsExpanded="True" Style="{StaticResource ModuleExpanderStyle}">
-                    <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="14" Padding="14">
+                <Border x:Name="ImeToolsPanel" Style="{StaticResource ModuleCardStyle}">
+                    <StackPanel>
+                        <ToggleButton x:Name="ImeModuleToggle"
+                                      Content="自动切换输入法"
+                                      IsChecked="True"
+                                      Style="{StaticResource ModuleHeaderToggleStyle}"/>
+                        <Border Style="{StaticResource ModuleContentFrameStyle}"
+                                Visibility="{Binding IsChecked, ElementName=ImeModuleToggle, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
-                            <DockPanel Margin="0,0,0,6">
-                                <Border DockPanel.Dock="Right" Style="{StaticResource BadgeStyle}">
-                                    <TextBlock Text="IME" Foreground="#AFCBFF" FontSize="11" FontWeight="SemiBold"/>
-                                </Border>
-                            </DockPanel>
-                            <TextBlock Text="用于文字编辑时切中文、结束后切英文。建议中文输入法和美式键盘各保留一个。"
+<TextBlock Text="用于文字编辑时切中文、结束后切英文。建议中文输入法和美式键盘各保留一个。"
                                        Style="{StaticResource HintTextStyle}"/>
 
-                            <TextBlock Text="中文输入法" Style="{StaticResource LabelTextStyle}"/>
-                            <ComboBox x:Name="ComboChineseIME" Style="{StaticResource DarkPickerComboStyle}"/>
+                            <TextBlock Text="中文输入法" Style="{StaticResource LabelTextStyle}" Visibility="Collapsed"/>
+                            <ComboBox x:Name="ComboChineseIME" Style="{StaticResource DarkPickerComboStyle}" Visibility="Collapsed"/>
 
-                            <TextBlock Text="英文键盘" Style="{StaticResource LabelTextStyle}"/>
-                            <ComboBox x:Name="ComboEnglishIME" Style="{StaticResource DarkPickerComboStyle}"/>
+                            <TextBlock Text="英文键盘" Style="{StaticResource LabelTextStyle}" Visibility="Collapsed"/>
+                            <ComboBox x:Name="ComboEnglishIME" Style="{StaticResource DarkPickerComboStyle}" Visibility="Collapsed"/>
 
                             <Button Content="启动输入法自动切换" Style="{StaticResource PrimaryButtonStyle}" Click="OnBtnSaveIMESettingsClick"
                                     ToolTip="保存当前选择的中文/英文输入法。"/>
                         </StackPanel>
-                    </Border>
-                </Expander>
+                        </Border>
+                    </StackPanel>
+                </Border>
 
-                <Expander x:Name="FontToolsPanel" Header="字体工具" IsExpanded="False" Style="{StaticResource ModuleExpanderStyle}">
-                    <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="14" Padding="14">
+                <Border x:Name="FontToolsPanel" Style="{StaticResource ModuleCardStyle}">
+                    <StackPanel>
+                        <ToggleButton x:Name="FontModuleToggle"
+                                      Content="字体工具"
+                                      IsChecked="False"
+                                      Style="{StaticResource ModuleHeaderToggleStyle}"/>
+                        <Border Style="{StaticResource ModuleContentFrameStyle}"
+                                Visibility="{Binding IsChecked, ElementName=FontModuleToggle, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
-                            <DockPanel Margin="0,0,0,6">
-                                <Border DockPanel.Dock="Right" Style="{StaticResource BadgeStyle}">
-                                    <TextBlock Text="TEXT" Foreground="{StaticResource TextSub}" FontSize="11" FontWeight="SemiBold"/>
-                                </Border>
-                            </DockPanel>
-                            <TextBlock Text="修复全图文字样式前建议先保存图纸。"
+<TextBlock Text="修复全图文字样式前建议先保存图纸。"
                                        Foreground="{StaticResource Warn}"
                                        FontSize="12"
                                        LineHeight="18"
@@ -366,18 +596,19 @@
                                        Margin="0,0,0,12"/>
 
                             <TextBlock Text="目标字体" Style="{StaticResource LabelTextStyle}"/>
-                            <ComboBox x:Name="ComboShx" IsEditable="True"/>
+                            <ComboBox x:Name="ComboShx" IsEditable="True" Style="{StaticResource DarkEditableComboStyle}"/>
 
                             <TextBlock Text="备选大字体" Style="{StaticResource LabelTextStyle}"/>
-                            <ComboBox x:Name="ComboBoxBig" IsEditable="True"/>
+                            <ComboBox x:Name="ComboBoxBig" IsEditable="True" Style="{StaticResource DarkEditableComboStyle}"/>
 
                             <Button Content="修复全图字体  FIXFONTS" Style="{StaticResource DangerButtonStyle}" Click="OnBtnFixFontsClick"
                                     ToolTip="执行 FIXFONTS：会修改全图文字样式，执行前会再次确认。"/>
                             <Button Content="标准化文字  TS" Style="{StaticResource ToolButtonStyle}" Click="OnBtnTextStandardClick"
                                     ToolTip="执行 TS：快速设置为预设文字字体。"/>
                         </StackPanel>
-                    </Border>
-                </Expander>
+                        </Border>
+                    </StackPanel>
+                </Border>
 
                 <Border x:Name="CleanupToolsPanel" Style="{StaticResource CardStyle}" Background="#201D20">
                     <StackPanel>
