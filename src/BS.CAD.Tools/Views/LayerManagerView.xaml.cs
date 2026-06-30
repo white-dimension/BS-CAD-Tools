@@ -21,6 +21,7 @@ using BS.CAD.Tools;
 using BS.CAD.Tools.Models;
 using BS.CAD.Tools.Utils;
 using BS.CAD.Tools.Engine;
+using BS.CAD.Tools.Engine.Layer;
 
 namespace BS.CAD.Tools.Views
 {
@@ -735,56 +736,58 @@ namespace BS.CAD.Tools.Views
 
                 var doc = AcadApp.DocumentManager.MdiActiveDocument;
                 if (doc == null) return;
-                using (doc.LockDocument())
-                using (var tr = doc.Database.TransactionManager.StartTransaction()) {
-                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                    if (lt == null) return;
-                    bool? targetState = tag switch
-                    {
-                        "On" => !item.IsOn,
-                        "Freeze" => !item.IsFrozen,
-                        "Lock" => !item.IsLocked,
-                        "Plot" => !item.IsPlottable,
-                        "VPFreeze" => !item.IsVPFrozen,
-                        _ => null
-                    };
 
-                    if (tag == "On")
+                bool? targetState = tag switch
+                {
+                    "On" => !item.IsOn,
+                    "Freeze" => !item.IsFrozen,
+                    "Lock" => !item.IsLocked,
+                    "Plot" => !item.IsPlottable,
+                    "VPFreeze" => !item.IsVPFrozen,
+                    _ => null
+                };
+
+                if (targetState == null) return;
+
+                // Engine 托管的操作：独立事务处理
+                if (tag == "On" || tag == "Lock" || tag == "Freeze")
+                {
+                    string lastError = "";
+                    foreach (var s in sel)
                     {
+                        LayerOperationResult? res = null;
+                        if (tag == "On") res = _engine.Layers.SetLayerOn(s.Name, targetState.Value);
+                        else if (tag == "Lock") res = _engine.Layers.SetLayerLocked(s.Name, targetState.Value);
+                        else if (tag == "Freeze") res = _engine.Layers.SetLayerFrozen(s.Name, targetState.Value);
+
+                        if (res != null && !res.Success) lastError = res.Message;
+                    }
+                    if (!string.IsNullOrEmpty(lastError)) TxtStatus.Text = lastError;
+                }
+                else
+                {
+                    // 尚未抽离的操作：继续使用旧的 UI 事务
+                    using (doc.LockDocument())
+                    using (var tr = doc.Database.TransactionManager.StartTransaction())
+                    {
+                        LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                        if (lt == null) return;
+
                         foreach (var s in sel)
                         {
-                            _engine.Layers.SetLayerOn(s.Name, targetState ?? true);
-                        }
-                    }
-                    else if (tag == "Lock")
-                    {
-                        foreach (var s in sel)
-                        {
-                            _engine.Layers.SetLayerLocked(s.Name, targetState ?? true);
-                        }
-                    }
-                    else if (tag == "Freeze")
-                    {
-                        foreach (var s in sel)
-                        {
-                            var res = _engine.Layers.SetLayerFrozen(s.Name, targetState ?? true);
-                            if (!res.Success) TxtStatus.Text = res.Message;
-                        }
-                    }
-                    else
-                    {
-                        foreach (var s in sel) {
-                            if (lt.Has(s.Name)) {
+                            if (lt.Has(s.Name))
+                            {
                                 var ltr = tr.GetObject(lt[s.Name], OpenMode.ForWrite) as LayerTableRecord;
-                                if (ltr == null || targetState == null) continue;
+                                if (ltr == null) continue;
 
                                 if (tag == "Plot") ltr.IsPlottable = targetState.Value;
                                 else if (tag == "VPFreeze") ltr.ViewportVisibilityDefault = targetState.Value;
                             }
                         }
+                        tr.Commit();
                     }
-                    tr.Commit();
                 }
+
                 RefreshLayerList();
                 doc.Editor.Regen();
             } catch (System.Exception ex) { Logger.Error(ex); AcadApp.ShowAlertDialog(ex.Message); }
