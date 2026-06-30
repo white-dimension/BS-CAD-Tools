@@ -78,6 +78,8 @@ namespace BS.CAD.Tools.Views
         public LayerManagerView()
         {
             InitializeComponent();
+            GridLayers.CanUserDeleteRows = false;
+            GridLayers.CanUserAddRows = false;
             ConfigureIme();
             this.Loaded += OnLoaded;
             this.Unloaded += OnUnloaded;
@@ -88,6 +90,7 @@ namespace BS.CAD.Tools.Views
         {
             ImeManager.enableChineseIme(TxtSearch);
             GridLayers.PreparingCellForEdit += OnGridPreparingCellForEdit;
+            GridLayers.PreviewKeyDown += OnGridLayersPreviewKeyDown;
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -955,24 +958,40 @@ namespace BS.CAD.Tools.Views
             var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
             if (sel.Count == 0) { AcadApp.ShowAlertDialog("请先选中要删除的图层。"); return; }
             if (System.Windows.MessageBox.Show($"将尝试删除 {sel.Count} 个图层。当前图层和正在使用的图层会自动跳过。\n\n建议先保存图纸，是否继续？", "CAD助手 - 删除图层确认", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction()) {
-                LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                if (lt == null) return;
+
+            try
+            {
+                int successCount = 0;
+                string lastMessage = "";
+
                 foreach (var s in sel)
-                    if (!s.IsCurrent && lt.Has(s.Name))
+                {
+                    var result = _engine.Layers.DeleteLayer(s.Name);
+                    if (result.Success)
                     {
-                        try
-                        {
-                            if (tr.GetObject(lt[s.Name], OpenMode.ForWrite) is LayerTableRecord ltr)
-                                ltr.Erase();
-                        }
-                        catch (Exception ex) { Logger.Error(ex); TxtStatus.Text = $"无法删除图层: {s.Name}"; }
+                        successCount++;
                     }
-                tr.Commit();
+                    else
+                    {
+                        lastMessage = result.Message;
+                    }
+                }
+
+                if (successCount == sel.Count)
+                {
+                    TxtStatus.Text = $"成功删除 {successCount} 个图层。";
+                }
+                else
+                {
+                    TxtStatus.Text = $"删除了 {successCount}/{sel.Count} 个图层。最后提示: {lastMessage}";
+                }
             }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                TxtStatus.Text = $"删除操作出现错误: {ex.Message}";
+            }
+
             RefreshLayerList();
         }
 
@@ -1144,6 +1163,15 @@ namespace BS.CAD.Tools.Views
         private void OnRefreshManual(object s, RoutedEventArgs e)
         {
             RefreshLayerList();
+        }
+
+        private void OnGridLayersPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == Key.Delete)
+            {
+                e.Handled = true;
+                OnDeleteLayer(sender, e);
+            }
         }
 
         private void OnGridKeyDown(object sender, System.Windows.Input.KeyEventArgs e)

@@ -36,7 +36,7 @@ namespace BS.CAD.Tools.Engine.Layer
                 foreach (ObjectId id in layerTable)
                 {
                     LayerTableRecord? layer = tr.GetObject(id, OpenMode.ForRead) as LayerTableRecord;
-                    if (layer == null || layer.IsErased)
+                    if (layer == null || layer.IsErased || layer.IsDisposed || string.IsNullOrWhiteSpace(layer.Name))
                         continue;
 
                     var color = ResolveLayerColor(layer);
@@ -111,6 +111,60 @@ namespace BS.CAD.Tools.Engine.Layer
                 }
 
                 tr.Commit();
+            }
+        }
+
+        public LayerOperationResult DeleteLayer(string layerName)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            if (layerName == "0")
+                return new LayerOperationResult { Success = false, Message = "不能删除 0 图层。" };
+
+            if (string.Equals(layerName, "Defpoints", StringComparison.OrdinalIgnoreCase))
+                return new LayerOperationResult { Success = false, Message = "不建议删除 Defpoints 图层。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    ObjectId layerId = lt[layerName];
+                    if (layerId == doc.Database.Clayer)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "不能删除当前图层。" };
+                    }
+
+                    var ltr = tr.GetObject(layerId, OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null)
+                    {
+                        ltr.Erase();
+                    }
+
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "图层已删除。" };
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"删除失败: {ex.Message}" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"系统错误: {ex.Message}" };
             }
         }
 
