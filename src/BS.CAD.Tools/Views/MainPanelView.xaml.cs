@@ -30,6 +30,7 @@ namespace BS.CAD.Tools.Views
         public MainPanelView()
         {
             InitializeComponent();
+            ConfigureIme();
             LoadInstalledInputLanguages();
             LoadLocalFonts();
             ApplyModuleVisibility();
@@ -41,6 +42,14 @@ namespace BS.CAD.Tools.Views
             };
             _timer.Tick += (s, e) => UpdateCurrentIMEDisplay();
             _timer.Start();
+        }
+
+        private void ConfigureIme()
+        {
+            ImeManager.enableEnglishIme(ComboChineseIME);
+            ImeManager.enableEnglishIme(ComboEnglishIME);
+            ImeManager.enableEnglishIme(ComboShx);
+            ImeManager.enableEnglishIme(ComboBoxBig);
         }
 
         private void ApplyModuleVisibility()

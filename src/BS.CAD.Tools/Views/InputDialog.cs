@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
+using BS.CAD.Tools.Utils;
 
 namespace BS.CAD.Tools.Views
 {
@@ -66,7 +67,7 @@ namespace BS.CAD.Tools.Views
             dlg.Resources.Add(typeof(System.Windows.Controls.ComboBoxItem), cbiStyle);
         }
 
-        public static string? Show(string title, string prompt, string defaultValue = "")
+        public static string? Show(string title, string prompt, string defaultValue = "", bool preferChineseIme = true)
         {
             var dlg = new System.Windows.Window
             {
@@ -91,14 +92,27 @@ namespace BS.CAD.Tools.Views
             var txtBorder = new System.Windows.Controls.Border { Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 35, 38)), CornerRadius = new System.Windows.CornerRadius(7), Padding = new System.Windows.Thickness(10, 8, 10, 8), BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 58, 63)), BorderThickness = new System.Windows.Thickness(1) };
             var txt = new System.Windows.Controls.TextBox { Text = defaultValue, Background = System.Windows.Media.Brushes.Transparent, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(231, 237, 242)), BorderThickness = new System.Windows.Thickness(0), CaretBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(231, 237, 242)) };
             txtBorder.Child = txt;
+            if (preferChineseIme)
+                ImeManager.enableChineseIme(txt);
+            else
+                ImeManager.enableEnglishIme(txt);
 
-            var btnStack = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Margin = new System.Windows.Thickness(0, 20, 0, 0) };
+            var btnStack = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Margin = new System.Windows.Thickness(0, 22, 0, 0) };
             var cancelBtn = new System.Windows.Controls.Button { Content = "取消", Width = 80, Height = 34, Background = System.Windows.Media.Brushes.Transparent, BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(78, 91, 100)), BorderThickness = new System.Windows.Thickness(1), Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(143, 154, 163)), Margin = new System.Windows.Thickness(0, 0, 10, 0) };
-            cancelBtn.Template = CreateRoundedButtonTemplate(6);
+            cancelBtn.Width = 88;
+            cancelBtn.Height = 36;
+            cancelBtn.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(170, 180, 192));
+            cancelBtn.Margin = new System.Windows.Thickness(0, 0, 12, 0);
+            cancelBtn.Template = CreateRoundedButtonTemplate(8);
             cancelBtn.Click += (s, e) => dlg.Close();
 
             var okBtn = new System.Windows.Controls.Button { Content = "确定", Width = 80, Height = 34, Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 214)), BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 214)), BorderThickness = new System.Windows.Thickness(1), Foreground = System.Windows.Media.Brushes.White };
-            okBtn.Template = CreateRoundedButtonTemplate(6);
+            okBtn.Width = 88;
+            okBtn.Height = 36;
+            okBtn.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(53, 120, 246));
+            okBtn.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(90, 145, 255));
+            okBtn.FontWeight = System.Windows.FontWeights.SemiBold;
+            okBtn.Template = CreateRoundedButtonTemplate(8);
             okBtn.Click += (s, e) => { dlg.DialogResult = true; dlg.Close(); };
             okBtn.IsDefault = true;
 
@@ -123,7 +137,7 @@ namespace BS.CAD.Tools.Views
         {
             var dlg = new System.Windows.Window
             {
-                Width = 400, Height = 320,
+                Width = 420, Height = 300,
                 WindowStyle = System.Windows.WindowStyle.None,
                 AllowsTransparency = true,
                 Background = System.Windows.Media.Brushes.Transparent,
@@ -136,23 +150,23 @@ namespace BS.CAD.Tools.Views
             try { new System.Windows.Interop.WindowInteropHelper(dlg).Owner = AcadApp.MainWindow.Handle; }
             catch { dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen; }
 
-            var mainBorder = new System.Windows.Controls.Border { Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(36, 39, 41)), CornerRadius = new System.Windows.CornerRadius(12), BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(61, 69, 75)), BorderThickness = new System.Windows.Thickness(1) };
-            var root = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(24) };
+            var mainBorder = new System.Windows.Controls.Border { Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(29, 34, 40)), CornerRadius = new System.Windows.CornerRadius(12), BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(61, 69, 75)), BorderThickness = new System.Windows.Thickness(1) };
+            var root = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(28, 20, 28, 18) };
 
-            var titleTxt = new System.Windows.Controls.TextBlock { Text = title, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(231, 237, 242)), FontSize = 18, FontWeight = System.Windows.FontWeights.SemiBold, Margin = new System.Windows.Thickness(0, 0, 0, 8) };
-            var promptTxt = new System.Windows.Controls.TextBlock { Text = prompt, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(143, 154, 163)), FontSize = 12, Margin = new System.Windows.Thickness(0, 0, 0, 16) };
+            var titleTxt = new System.Windows.Controls.TextBlock { Text = title, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(243, 246, 250)), FontSize = 20, FontWeight = System.Windows.FontWeights.SemiBold, Margin = new System.Windows.Thickness(0, 0, 0, 8) };
+            var promptTxt = new System.Windows.Controls.TextBlock { Text = prompt, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(170, 180, 192)), FontSize = 12, Margin = new System.Windows.Thickness(0, 0, 0, 12) };
 
             string selectedValue = options.Contains(defaultOption) ? defaultOption : (options.Count > 0 ? options[0] : "");
 
             var listBorder = new System.Windows.Controls.Border
             {
-                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 35, 38)),
-                BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 58, 63)),
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(20, 25, 31)),
+                BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 66, 77)),
                 BorderThickness = new System.Windows.Thickness(1),
-                CornerRadius = new System.Windows.CornerRadius(8),
-                Height = 150
+                CornerRadius = new System.Windows.CornerRadius(10),
+                Height = 128
             };
-            var optionStack = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(4) };
+            var optionStack = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(6) };
             var optionButtons = new List<System.Windows.Controls.Button>();
             void RefreshOptionButtons()
             {
@@ -160,11 +174,11 @@ namespace BS.CAD.Tools.Views
                 {
                     bool active = string.Equals(b.Tag?.ToString(), selectedValue, StringComparison.Ordinal);
                     b.Background = new System.Windows.Media.SolidColorBrush(active
-                        ? System.Windows.Media.Color.FromRgb(38, 56, 71)
-                        : System.Windows.Media.Color.FromRgb(31, 35, 38));
+                        ? System.Windows.Media.Color.FromRgb(29, 47, 63)
+                        : System.Windows.Media.Color.FromRgb(20, 25, 31));
                     b.BorderBrush = new System.Windows.Media.SolidColorBrush(active
-                        ? System.Windows.Media.Color.FromRgb(10, 132, 214)
-                        : System.Windows.Media.Color.FromRgb(31, 35, 38));
+                        ? System.Windows.Media.Color.FromRgb(53, 120, 246)
+                        : System.Windows.Media.Color.FromRgb(20, 25, 31));
                 }
             }
 
@@ -175,15 +189,15 @@ namespace BS.CAD.Tools.Views
                     Content = option,
                     Tag = option,
                     Height = 34,
-                    HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left,
-                    Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 35, 38)),
-                    BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 35, 38)),
+                    HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center,
+                    Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(20, 25, 31)),
+                    BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(20, 25, 31)),
                     BorderThickness = new System.Windows.Thickness(1),
-                    Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(231, 237, 242)),
+                    Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(243, 246, 250)),
                     Margin = new System.Windows.Thickness(0, 0, 0, 3),
                     Padding = new System.Windows.Thickness(12, 0, 12, 0)
                 };
-                optionButton.Template = CreateRoundedButtonTemplate(6);
+                optionButton.Template = CreateRoundedButtonTemplate(8);
                 optionButton.Click += (s, e) =>
                 {
                     selectedValue = option;
@@ -208,13 +222,22 @@ namespace BS.CAD.Tools.Views
             };
             listBorder.Child = scroll;
 
-            var btnStack = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Margin = new System.Windows.Thickness(0, 20, 0, 0) };
+            var btnStack = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Margin = new System.Windows.Thickness(0, 14, 0, 0) };
             var cancelBtn = new System.Windows.Controls.Button { Content = "取消", Width = 80, Height = 34, Background = System.Windows.Media.Brushes.Transparent, BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(78, 91, 100)), BorderThickness = new System.Windows.Thickness(1), Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(143, 154, 163)), Margin = new System.Windows.Thickness(0, 0, 10, 0) };
-            cancelBtn.Template = CreateRoundedButtonTemplate(6);
+            cancelBtn.Width = 84;
+            cancelBtn.Height = 34;
+            cancelBtn.Margin = new System.Windows.Thickness(0, 0, 12, 0);
+            cancelBtn.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(170, 180, 192));
+            cancelBtn.Template = CreateRoundedButtonTemplate(8);
             cancelBtn.Click += (s, e) => dlg.Close();
 
             var okBtn = new System.Windows.Controls.Button { Content = "确定", Width = 80, Height = 34, Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 214)), BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 214)), BorderThickness = new System.Windows.Thickness(1), Foreground = System.Windows.Media.Brushes.White };
-            okBtn.Template = CreateRoundedButtonTemplate(6);
+            okBtn.Width = 84;
+            okBtn.Height = 34;
+            okBtn.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(53, 120, 246));
+            okBtn.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(90, 145, 255));
+            okBtn.FontWeight = System.Windows.FontWeights.SemiBold;
+            okBtn.Template = CreateRoundedButtonTemplate(8);
             okBtn.Click += (s, e) => { dlg.DialogResult = true; dlg.Close(); };
             okBtn.IsDefault = true;
 
@@ -267,6 +290,8 @@ namespace BS.CAD.Tools.Views
             var nameBox = BuildTextBox(name);
             var descLabel = new System.Windows.Controls.TextBlock { Text = "说明", Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(143, 154, 163)), FontSize = 12, Margin = new System.Windows.Thickness(0, 0, 0, 6) };
             var descBox = BuildTextBox(description);
+            ImeManager.enableChineseIme(nameBox);
+            ImeManager.enableChineseIme(descBox);
 
             var btnStack = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Margin = new System.Windows.Thickness(0, 8, 0, 0) };
             var cancelBtn = new System.Windows.Controls.Button { Content = "取消", Width = 88, Height = 36, Background = System.Windows.Media.Brushes.Transparent, BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(78, 91, 100)), BorderThickness = new System.Windows.Thickness(1), Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(143, 154, 163)), Margin = new System.Windows.Thickness(0, 0, 12, 0) };

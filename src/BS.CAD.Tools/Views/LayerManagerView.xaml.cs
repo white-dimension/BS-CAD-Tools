@@ -15,6 +15,7 @@ using Autodesk.AutoCAD.Windows;
 using AcColor = Autodesk.AutoCAD.Colors.Color;
 using Autodesk.AutoCAD.ApplicationServices;
 using System.Windows.Controls.Primitives;
+using System.Text;
 
 using BS.CAD.Tools;
 using BS.CAD.Tools.Models;
@@ -69,19 +70,29 @@ namespace BS.CAD.Tools.Views
         private bool _syncPending;
         private System.Windows.Point _toolbarDragStart;
         private bool _toolbarDragInitialized;
+        private bool _drawingStateLoaded;
+        private const string LayerManagerStateKey = "BS_CAD_TOOLS_LAYER_MANAGER_STATE";
 
         public LayerManagerView()
         {
             InitializeComponent();
+            ConfigureIme();
             this.Loaded += OnLoaded;
             this.Unloaded += OnUnloaded;
             this.IsVisibleChanged += OnIsVisibleChanged;
+        }
+
+        private void ConfigureIme()
+        {
+            ImeManager.enableChineseIme(TxtSearch);
+            GridLayers.PreparingCellForEdit += OnGridPreparingCellForEdit;
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             InitToolbarDrag();
             InitSettingsPanel();
+            LoadLocalUiState();
             Dispatcher.BeginInvoke(new Action(RefreshLayerList));
             WatchDatabase();
             AcadApp.DocumentManager.DocumentActivated += OnDocumentActivated;
@@ -202,6 +213,7 @@ namespace BS.CAD.Tools.Views
             if (_toolbarDragInitialized) return;
             _toolbarDragInitialized = true;
             LoadToolbarOrder();
+            RebuildToolbarPanelWithGroups(ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().ToList());
             ToolbarPanel.AllowDrop = true;
             foreach (var button in ToolbarPanel.Children.OfType<System.Windows.Controls.Button>())
             {
@@ -246,12 +258,41 @@ namespace BS.CAD.Tools.Views
             int targetIndex = ToolbarPanel.Children.IndexOf(target);
             ToolbarPanel.Children.Remove(source);
             ToolbarPanel.Children.Insert(targetIndex, source);
+            RebuildToolbarPanelWithGroups(ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().ToList());
             SaveToolbarOrder();
             e.Handled = true;
         }
 
+        private void RebuildToolbarPanelWithGroups(IEnumerable<System.Windows.Controls.Button> buttons)
+        {
+            var orderedButtons = buttons.ToList();
+            ToolbarPanel.Children.Clear();
+
+            for (int i = 0; i < orderedButtons.Count; i++)
+            {
+                var button = orderedButtons[i];
+                if ((button.Name == nameof(BtnSnapshotSave) || button.Name == nameof(BtnSettings)) && ToolbarPanel.Children.Count > 0)
+                {
+                    ToolbarPanel.Children.Add(CreateToolbarDivider());
+                }
+
+                ToolbarPanel.Children.Add(button);
+            }
+        }
+
+        private Border CreateToolbarDivider()
+        {
+            return new Border
+            {
+                Style = TryFindResource("ToolbarDividerStyle") as Style
+            };
+        }
+
         private static string ToolbarOrderPath =>
             System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BS-CAD-Tools", "toolbar-order.txt");
+
+        private static string UiStatePath =>
+            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BS-CAD-Tools", "layer-manager-ui.json");
 
         private void LoadToolbarOrder()
         {
@@ -268,9 +309,7 @@ namespace BS.CAD.Tools.Views
                         ordered.Add(button);
 
                 ordered.AddRange(ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().Where(x => !ordered.Contains(x)));
-                ToolbarPanel.Children.Clear();
-                foreach (var button in ordered)
-                    ToolbarPanel.Children.Add(button);
+                RebuildToolbarPanelWithGroups(ordered);
             }
             catch (Exception ex)
             {
@@ -288,6 +327,97 @@ namespace BS.CAD.Tools.Views
 
                 var names = ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().Select(x => x.Name);
                 System.IO.File.WriteAllLines(ToolbarOrderPath, names);
+                SaveLocalUiState();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+            }
+        }
+
+        private LayerManagerUiState CaptureUiState()
+        {
+            return new LayerManagerUiState
+            {
+                Filters = _filterButtons.Values
+                    .Where(x => !string.IsNullOrWhiteSpace(x.Label))
+                    .Select(x => new LayerFilterTemplate
+                    {
+                        Label = x.Label,
+                        LayerNames = x.LayerNames.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct().ToList()
+                    })
+                    .ToList(),
+                Columns = GridLayers.Columns
+                    .Where(c => !string.IsNullOrWhiteSpace(c.Header?.ToString()))
+                    .Select(c => new LayerColumnState
+                    {
+                        Header = c.Header?.ToString() ?? "",
+                        Visible = c.Visibility == System.Windows.Visibility.Visible,
+                        Width = c.ActualWidth > 0 ? c.ActualWidth : c.Width.DisplayValue
+                    })
+                    .ToList(),
+                ToolbarOrder = ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().Select(x => x.Name).ToList()
+            };
+        }
+
+        private void ApplyUiState(LayerManagerUiState? state, bool includeFilters)
+        {
+            if (state == null) return;
+
+            if (state.Columns != null)
+            {
+                foreach (var saved in state.Columns)
+                {
+                    var col = GridLayers.Columns.FirstOrDefault(c => string.Equals(c.Header?.ToString(), saved.Header, StringComparison.Ordinal));
+                    if (col == null) continue;
+                    col.Visibility = saved.Visible ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                    if (saved.Width > 20)
+                        col.Width = new DataGridLength(saved.Width);
+                }
+            }
+
+            if (state.ToolbarOrder != null && state.ToolbarOrder.Count > 0)
+            {
+                var buttons = ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().ToDictionary(x => x.Name);
+                var ordered = new List<System.Windows.Controls.Button>();
+                foreach (var name in state.ToolbarOrder)
+                    if (buttons.TryGetValue(name, out var button) && !ordered.Contains(button))
+                        ordered.Add(button);
+                ordered.AddRange(ToolbarPanel.Children.OfType<System.Windows.Controls.Button>().Where(x => !ordered.Contains(x)));
+                RebuildToolbarPanelWithGroups(ordered);
+            }
+
+            if (includeFilters && state.Filters != null)
+            {
+                ClearCustomFilters();
+                foreach (var filter in state.Filters)
+                    CreateFilterLabel(filter.Label, filter.LayerNames);
+                SetActiveFilterButton(BtnFilterAll);
+            }
+        }
+
+        private void SaveLocalUiState()
+        {
+            try
+            {
+                var dir = System.IO.Path.GetDirectoryName(UiStatePath);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.WriteAllText(UiStatePath, JsonSerializer.Serialize(CaptureUiState(), new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+            }
+        }
+
+        private void LoadLocalUiState()
+        {
+            try
+            {
+                if (!System.IO.File.Exists(UiStatePath)) return;
+                var state = JsonSerializer.Deserialize<LayerManagerUiState>(System.IO.File.ReadAllText(UiStatePath));
+                ApplyUiState(state, includeFilters: false);
             }
             catch (Exception ex)
             {
@@ -310,6 +440,7 @@ namespace BS.CAD.Tools.Views
 
         private void OnDocumentActivated(object sender, DocumentCollectionEventArgs e)
         {
+            _drawingStateLoaded = false;
             WatchDatabase();
             RefreshLayerList();
         }
@@ -887,7 +1018,29 @@ namespace BS.CAD.Tools.Views
         }
 
         private void OnSearchChanged(object s, System.Windows.Controls.TextChangedEventArgs e) => UpdateDisplay();
-        private void OnSearchGotFocus(object s, RoutedEventArgs e) => CadApp.SwitchToIME(CadApp.TargetChineseHKL);
+        private void OnSearchGotFocus(object s, RoutedEventArgs e) => ImeManager.enableChineseIme(TxtSearch);
+
+        private void OnGridPreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
+        {
+            if (e.EditingElement is not System.Windows.Controls.TextBox textBox)
+                return;
+
+            if (e.Column is DataGridBoundColumn boundColumn
+                && boundColumn.Binding is System.Windows.Data.Binding binding
+                && string.Equals(binding.Path?.Path, nameof(SimpleLayerItem.Description), StringComparison.Ordinal))
+            {
+                ImeManager.enableChineseIme(textBox);
+            }
+            else
+            {
+                ImeManager.enableEnglishIme(textBox);
+            }
+        }
+        private void OnClearSearch(object sender, RoutedEventArgs e)
+        {
+            TxtSearch.Clear();
+            TxtSearch.Focus();
+        }
 
         private void OnGridCellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
         {
@@ -912,7 +1065,7 @@ namespace BS.CAD.Tools.Views
             var i = (s as System.Windows.Controls.Button)?.DataContext as SimpleLayerItem;
             if (i == null) return;
 
-            string? input = InputDialog.Show("修改透明度", "请输入透明度 (0=不透明, 90=最透明)：", i.TransparencyDisplay);
+            string? input = InputDialog.Show("修改透明度", "请输入透明度 (0=不透明, 90=最透明)：", i.TransparencyDisplay, preferChineseIme: false);
             if (string.IsNullOrWhiteSpace(input)) return;
 
             if (byte.TryParse(input, out byte alpha) && alpha <= 90)
@@ -1438,7 +1591,7 @@ namespace BS.CAD.Tools.Views
             }
             else if (mode == "透明度")
             {
-                string? input = InputDialog.Show("批量改属性 - 透明度", "输入 0-90：");
+                string? input = InputDialog.Show("批量改属性 - 透明度", "输入 0-90：", preferChineseIme: false);
                 if (string.IsNullOrWhiteSpace(input) || !byte.TryParse(input, out byte alpha) || alpha > 90) return;
                 using (doc.LockDocument())
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
