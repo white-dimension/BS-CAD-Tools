@@ -749,24 +749,46 @@ namespace BS.CAD.Tools.Views
 
                 if (targetState == null) return;
 
-                // Engine 托管的操作：独立事务处理
+                int successCount = 0;
+                int failCount = 0;
+                string lastError = "";
+                bool shouldRegen = false;
+
+                // Engine 托管的操作：独立事务处理，每个图层各自反转
                 if (tag == "On" || tag == "Lock" || tag == "Freeze")
                 {
-                    string lastError = "";
                     foreach (var s in sel)
                     {
                         LayerOperationResult? res = null;
-                        if (tag == "On") res = _engine.Layers.SetLayerOn(s.Name, targetState.Value);
-                        else if (tag == "Lock") res = _engine.Layers.SetLayerLocked(s.Name, targetState.Value);
-                        else if (tag == "Freeze") res = _engine.Layers.SetLayerFrozen(s.Name, targetState.Value);
+                        if (tag == "On") res = _engine.Layers.SetLayerOn(s.Name, !s.IsOn);
+                        else if (tag == "Lock") res = _engine.Layers.SetLayerLocked(s.Name, !s.IsLocked);
+                        else if (tag == "Freeze") res = _engine.Layers.SetLayerFrozen(s.Name, !s.IsFrozen);
 
-                        if (res != null && !res.Success) lastError = res.Message;
+                        if (res != null && res.Success)
+                        {
+                            successCount++;
+                        }
+                        else if (res != null)
+                        {
+                            failCount++;
+                            lastError = res.Message;
+                        }
                     }
-                    if (!string.IsNullOrEmpty(lastError)) TxtStatus.Text = lastError;
+
+                    if (failCount > 0)
+                    {
+                        TxtStatus.Text = lastError;
+                        AcadApp.ShowAlertDialog(lastError);
+                    }
+
+                    if (successCount > 0)
+                    {
+                        shouldRegen = true;
+                    }
                 }
                 else
                 {
-                    // 尚未抽离的操作：继续使用旧的 UI 事务
+                    // 尚未抽离的操作：继续使用旧的 UI 事务，保持统一 targetState
                     using (doc.LockDocument())
                     using (var tr = doc.Database.TransactionManager.StartTransaction())
                     {
@@ -785,11 +807,15 @@ namespace BS.CAD.Tools.Views
                             }
                         }
                         tr.Commit();
+                        shouldRegen = true;
                     }
                 }
 
                 RefreshLayerList();
-                doc.Editor.Regen();
+                if (shouldRegen)
+                {
+                    doc.Editor.Regen();
+                }
             } catch (System.Exception ex) { Logger.Error(ex); AcadApp.ShowAlertDialog(ex.Message); }
         }
 
