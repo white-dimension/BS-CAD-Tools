@@ -146,6 +146,20 @@ namespace BS.CAD.Tools.Engine.Layer
                         return new LayerOperationResult { Success = false, Message = "不能删除当前图层。" };
                     }
 
+                    // 使用 Purge 检查图层是否可删除 (未被使用)
+                    ObjectIdCollection ids = new ObjectIdCollection();
+                    ids.Add(layerId);
+                    doc.Database.Purge(ids);
+
+                    if (ids.Count == 0)
+                    {
+                        return new LayerOperationResult
+                        {
+                            Success = false,
+                            Message = "图层正在被使用，无法删除。"
+                        };
+                    }
+
                     var ltr = tr.GetObject(layerId, OpenMode.ForWrite) as LayerTableRecord;
                     if (ltr != null)
                     {

@@ -962,6 +962,7 @@ namespace BS.CAD.Tools.Views
             try
             {
                 int successCount = 0;
+                int failCount = 0;
                 string lastMessage = "";
 
                 foreach (var s in sel)
@@ -973,6 +974,7 @@ namespace BS.CAD.Tools.Views
                     }
                     else
                     {
+                        failCount++;
                         lastMessage = result.Message;
                     }
                 }
@@ -983,13 +985,18 @@ namespace BS.CAD.Tools.Views
                 }
                 else
                 {
-                    TxtStatus.Text = $"删除了 {successCount}/{sel.Count} 个图层。最后提示: {lastMessage}";
+                    TxtStatus.Text = $"删除了 {successCount}/{sel.Count} 个图层。失败 {failCount} 个。";
+                    if (failCount > 0 && !string.IsNullOrEmpty(lastMessage))
+                    {
+                        AcadApp.ShowAlertDialog($"部分图层删除失败。\n最后一条错误: {lastMessage}");
+                    }
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error(ex);
                 TxtStatus.Text = $"删除操作出现错误: {ex.Message}";
+                AcadApp.ShowAlertDialog($"删除操作失败: {ex.Message}");
             }
 
             RefreshLayerList();
@@ -1176,6 +1183,13 @@ namespace BS.CAD.Tools.Views
 
         private void OnGridKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
+            if (e.Key == System.Windows.Input.Key.Delete)
+            {
+                e.Handled = true;
+                OnDeleteLayer(sender, e);
+                return;
+            }
+
             if (e.Key == System.Windows.Input.Key.F2)
             {
                 var item = GridLayers.SelectedItem as SimpleLayerItem;
