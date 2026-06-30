@@ -551,57 +551,14 @@ namespace BS.CAD.Tools.Views
 
         private void LoadLayersFromDatabase()
         {
-            try {
-                var doc = AcadApp.DocumentManager.MdiActiveDocument;
-                if (doc == null) return;
+            try
+            {
+                var items = _engine.Layers.GetLayerItems()
+                    .Select(ToSimpleLayerItem)
+                    .ToList();
 
-                using (doc.LockDocument())
-                using (var tr = doc.Database.TransactionManager.StartTransaction()) {
-                    var items = new List<SimpleLayerItem>();
-                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                    if (lt == null)
-                    {
-                        Dispatcher.BeginInvoke(new Action(() => TxtStatus.Text = "同步图层: 0（无法读取图层表）"));
-                        return;
-                    }
-                    ObjectId curId = doc.Database.Clayer;
-
-                    foreach (ObjectId id in lt) {
-                        LayerTableRecord? ltr = tr.GetObject(id, OpenMode.ForRead) as LayerTableRecord;
-                        if (ltr == null || ltr.IsErased) continue;
-
-                        var (r, g, b, colorIndex) = ResolveLayerColor(ltr);
-                        string ltName = "Continuous";
-                        if (!ltr.LinetypeObjectId.IsNull)
-                        {
-                            try {
-                                var ltRec = tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) as LinetypeTableRecord;
-                                if (ltRec != null) ltName = ltRec.Name;
-                            } catch (Exception ex) { Logger.Error(ex); }
-                        }
-
-                        var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(r, g, b));
-                        brush.Freeze();
-
-                        items.Add(new SimpleLayerItem {
-                            Name = ltr.Name, IsOn = !ltr.IsOff, IsFrozen = ltr.IsFrozen, IsLocked = ltr.IsLocked,
-                            IsPlottable = ltr.IsPlottable, IsVPFrozen = ltr.ViewportVisibilityDefault,
-                            Linetype = ltName, Description = ltr.Description ?? "",
-                            Transparency = ResolveLayerTransparency(ltr),
-                            IsCurrent = (id == curId), ColorIndex = colorIndex,
-                            ColorBrush = brush, R = r, G = g, B = b,
-                            LineWeightDisplay = ResolveLineWeight(ltr)
-                        });
-                    }
-
-                    foreach (var item in items)
-                    {
-                    }
-
-                    tr.Commit();
-                    _cacheList = items;
-                    Dispatcher.BeginInvoke(new Action(UpdateDisplay));
-                }
+                _cacheList = items;
+                Dispatcher.BeginInvoke(new Action(UpdateDisplay));
             }
             catch (System.Exception ex)
             {
@@ -610,6 +567,31 @@ namespace BS.CAD.Tools.Views
             }
         }
 
+        private static SimpleLayerItem ToSimpleLayerItem(BS.CAD.Tools.Engine.Layer.LayerItemDto item)
+        {
+            var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(item.R, item.G, item.B));
+            brush.Freeze();
+
+            return new SimpleLayerItem
+            {
+                Name = item.Name,
+                IsOn = item.IsOn,
+                IsFrozen = item.IsFrozen,
+                IsLocked = item.IsLocked,
+                IsPlottable = item.IsPlottable,
+                IsVPFrozen = item.IsVPFrozen,
+                Linetype = item.Linetype,
+                Description = item.Description,
+                Transparency = item.Transparency,
+                IsCurrent = item.IsCurrent,
+                ColorIndex = item.ColorIndex,
+                ColorBrush = brush,
+                R = item.R,
+                G = item.G,
+                B = item.B,
+                LineWeightDisplay = item.LineWeightDisplay
+            };
+        }
         public void RefreshObjectCounts()
         {
             // 功能已删除
@@ -965,12 +947,9 @@ namespace BS.CAD.Tools.Views
         {
             var i = GridLayers.SelectedItem as SimpleLayerItem;
             if (i == null) return;
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            ExecuteLayerAction(i.Name, ltr => doc.Database.Clayer = ltr.ObjectId);
+            _engine.Layers.SetCurrentLayer(i.Name);
             RefreshLayerList();
         }
-
         private void OnDeleteLayer(object sender, RoutedEventArgs e)
         {
             var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
@@ -1757,18 +1736,16 @@ namespace BS.CAD.Tools.Views
 
         private void OnNewLayer(object sender, RoutedEventArgs e)
         {
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction()) {
-                LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForWrite) as LayerTable;
-                if (lt == null) return;
-                string name = "新图层_1"; int i = 1; while(lt.Has(name)) { i++; name = "新图层_" + i; }
-                LayerTableRecord ltr = new LayerTableRecord { Name = name };
-                lt.Add(ltr); tr.AddNewlyCreatedDBObject(ltr, true);
-                tr.Commit();
+            string name = "\u65b0\u56fe\u5c42_1";
+            int i = 1;
+            var existingNames = _cacheList.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            while (existingNames.Contains(name))
+            {
+                i++;
+                name = "\u65b0\u56fe\u5c42_" + i;
             }
+
+            _engine.Layers.CreateLayer(name);
             RefreshLayerList();
-        }
-    }
+        } }
 }
