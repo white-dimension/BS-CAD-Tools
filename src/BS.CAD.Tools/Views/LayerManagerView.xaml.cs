@@ -20,6 +20,7 @@ using System.Text;
 using BS.CAD.Tools;
 using BS.CAD.Tools.Models;
 using BS.CAD.Tools.Utils;
+using BS.CAD.Tools.Engine;
 
 namespace BS.CAD.Tools.Views
 {
@@ -60,6 +61,7 @@ namespace BS.CAD.Tools.Views
 
     public partial class LayerManagerView : System.Windows.Controls.UserControl
     {
+        private readonly CadEngine _engine = CadEngine.Current;
         private List<SimpleLayerItem> _cacheList = new List<SimpleLayerItem>();
         private FilterTagInfo? _activeFilter;
         private readonly Dictionary<System.Windows.Controls.Button, FilterTagInfo> _filterButtons = new();

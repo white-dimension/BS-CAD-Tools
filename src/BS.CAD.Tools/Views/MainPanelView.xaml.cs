@@ -13,6 +13,7 @@ using Autodesk.AutoCAD.DatabaseServices;
 using BS.CAD.Tools.Models;
 using BS.CAD.Tools.Services;
 using BS.CAD.Tools.Utils;
+using BS.CAD.Tools.Engine;
 using Microsoft.Win32;
 using WinForms = System.Windows.Forms;
 using WpfUserControl = System.Windows.Controls.UserControl;
@@ -22,6 +23,7 @@ namespace BS.CAD.Tools.Views
     public partial class MainPanelView : WpfUserControl
     {
         private readonly DispatcherTimer _timer;
+        private readonly CadEngine _engine = CadEngine.Current;
         private readonly SettingsService _settingsService = new();
 
         [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
