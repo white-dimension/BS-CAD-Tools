@@ -219,6 +219,43 @@ namespace BS.CAD.Tools.Engine.Layer
             }
         }
 
+        public LayerOperationResult SetLayerLocked(string layerName, bool isLocked)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    var ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null)
+                    {
+                        ltr.IsLocked = isLocked;
+                    }
+
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = isLocked ? "图层已锁定。" : "图层已解锁。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"操作失败: {ex.Message}" };
+            }
+        }
+
         private static string ResolveLinetypeName(Transaction tr, LayerTableRecord layer)
         {
             if (layer.LinetypeObjectId.IsNull)

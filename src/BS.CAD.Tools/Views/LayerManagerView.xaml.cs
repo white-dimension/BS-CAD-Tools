@@ -756,6 +756,13 @@ namespace BS.CAD.Tools.Views
                             _engine.Layers.SetLayerOn(s.Name, targetState ?? true);
                         }
                     }
+                    else if (tag == "Lock")
+                    {
+                        foreach (var s in sel)
+                        {
+                            _engine.Layers.SetLayerLocked(s.Name, targetState ?? true);
+                        }
+                    }
                     else
                     {
                         foreach (var s in sel) {
@@ -764,7 +771,6 @@ namespace BS.CAD.Tools.Views
                                 if (ltr == null || targetState == null) continue;
 
                                 if (tag == "Freeze" && !s.IsCurrent) ltr.IsFrozen = targetState.Value;
-                                else if (tag == "Lock") ltr.IsLocked = targetState.Value;
                                 else if (tag == "Plot") ltr.IsPlottable = targetState.Value;
                                 else if (tag == "VPFreeze") ltr.ViewportVisibilityDefault = targetState.Value;
                             }
