@@ -256,6 +256,49 @@ namespace BS.CAD.Tools.Engine.Layer
             }
         }
 
+        public LayerOperationResult SetLayerFrozen(string layerName, bool isFrozen)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    ObjectId layerId = lt[layerName];
+                    if (isFrozen && layerId == doc.Database.Clayer)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "不能冻结当前图层。" };
+                    }
+
+                    var ltr = tr.GetObject(layerId, OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null)
+                    {
+                        ltr.IsFrozen = isFrozen;
+                    }
+
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = isFrozen ? "图层已冻结。" : "图层已解冻。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"操作失败: {ex.Message}" };
+            }
+        }
+
         private static string ResolveLinetypeName(Transaction tr, LayerTableRecord layer)
         {
             if (layer.LinetypeObjectId.IsNull)
