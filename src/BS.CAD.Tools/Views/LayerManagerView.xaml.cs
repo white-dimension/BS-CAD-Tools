@@ -749,16 +749,25 @@ namespace BS.CAD.Tools.Views
                         _ => null
                     };
 
-                    foreach (var s in sel) {
-                        if (lt.Has(s.Name)) {
-                            var ltr = tr.GetObject(lt[s.Name], OpenMode.ForWrite) as LayerTableRecord;
-                            if (ltr == null || targetState == null) continue;
+                    if (tag == "On")
+                    {
+                        foreach (var s in sel)
+                        {
+                            _engine.Layers.SetLayerOn(s.Name, targetState ?? true);
+                        }
+                    }
+                    else
+                    {
+                        foreach (var s in sel) {
+                            if (lt.Has(s.Name)) {
+                                var ltr = tr.GetObject(lt[s.Name], OpenMode.ForWrite) as LayerTableRecord;
+                                if (ltr == null || targetState == null) continue;
 
-                            if (tag == "On") ltr.IsOff = !targetState.Value;
-                            else if (tag == "Freeze" && !s.IsCurrent) ltr.IsFrozen = targetState.Value;
-                            else if (tag == "Lock") ltr.IsLocked = targetState.Value;
-                            else if (tag == "Plot") ltr.IsPlottable = targetState.Value;
-                            else if (tag == "VPFreeze") ltr.ViewportVisibilityDefault = targetState.Value;
+                                if (tag == "Freeze" && !s.IsCurrent) ltr.IsFrozen = targetState.Value;
+                                else if (tag == "Lock") ltr.IsLocked = targetState.Value;
+                                else if (tag == "Plot") ltr.IsPlottable = targetState.Value;
+                                else if (tag == "VPFreeze") ltr.ViewportVisibilityDefault = targetState.Value;
+                            }
                         }
                     }
                     tr.Commit();
