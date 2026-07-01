@@ -74,6 +74,7 @@ namespace BS.CAD.Tools.Views
         private System.Windows.Point _toolbarDragStart;
         private bool _toolbarDragInitialized;
         private bool _drawingStateLoaded;
+        private bool _suppressSelectionChanged;
         private const string LayerManagerStateKey = "BS_CAD_TOOLS_LAYER_MANAGER_STATE";
 
         public LayerManagerView()
@@ -642,7 +643,11 @@ namespace BS.CAD.Tools.Views
             TxtStatus.Text = $"共 {_cacheList.Count} 层 / 显示 {visible} 层 / 已选 {selected} 层 / 当前层: {current}";
         }
 
-        private void OnGridSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateStatus();
+        private void OnGridSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressSelectionChanged) return;
+            UpdateStatus();
+        }
 
         private void OnGridPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -1541,6 +1546,11 @@ namespace BS.CAD.Tools.Views
             var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
             if (sel.Count < 1) { AcadApp.ShowAlertDialog("请至少选中 1 个图层。"); return; }
 
+            var selectedNames = GridLayers.SelectedItems
+                .OfType<SimpleLayerItem>()
+                .Select(x => x.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             var modes = new List<string> { "颜色", "线型", "线宽", "透明度" };
             string? mode = InputDialog.Select("批量改属性", "选择属性：", modes, "颜色");
             if (string.IsNullOrWhiteSpace(mode)) return;
@@ -1600,8 +1610,46 @@ namespace BS.CAD.Tools.Views
                     else { failCount++; lastError = result.Message; }
                 }
             }
+            else if (mode == "线宽")
+            {
+                var lwList = new List<string> { "默认", "ByLayer", "ByBlock", "0.00", "0.05", "0.09", "0.13", "0.15", "0.18", "0.20", "0.25", "0.30", "0.35", "0.40", "0.50", "0.53", "0.60", "0.70", "0.80", "0.90", "1.00", "1.06", "1.20", "1.40", "1.58", "2.00", "2.11" };
+                string? selLw = InputDialog.Select("批量改属性 - 线宽", "选择线宽：", lwList, sel[0].LineWeightDisplay);
+                if (string.IsNullOrWhiteSpace(selLw)) return;
+
+                LineWeight lw = selLw switch
+                {
+                    "ByLayer" => LineWeight.ByLayer,
+                    "ByBlock" => LineWeight.ByBlock,
+                    "默认" => LineWeight.ByLineWeightDefault,
+                    "0.00" => LineWeight.LineWeight000, "0.05" => LineWeight.LineWeight005, "0.09" => LineWeight.LineWeight009,
+                    "0.13" => LineWeight.LineWeight013, "0.15" => LineWeight.LineWeight015, "0.18" => LineWeight.LineWeight018,
+                    "0.20" => LineWeight.LineWeight020, "0.25" => LineWeight.LineWeight025, "0.30" => LineWeight.LineWeight030,
+                    "0.35" => LineWeight.LineWeight035, "0.40" => LineWeight.LineWeight040, "0.50" => LineWeight.LineWeight050,
+                    "0.53" => LineWeight.LineWeight053, "0.60" => LineWeight.LineWeight060, "0.70" => LineWeight.LineWeight070,
+                    "0.80" => LineWeight.LineWeight080, "0.90" => LineWeight.LineWeight090, "1.00" => LineWeight.LineWeight100,
+                    "1.06" => LineWeight.LineWeight106, "1.20" => LineWeight.LineWeight120, "1.40" => LineWeight.LineWeight140,
+                    "1.58" => LineWeight.LineWeight158, "2.00" => LineWeight.LineWeight200, "2.11" => LineWeight.LineWeight211,
+                    _ => LineWeight.ByLineWeightDefault
+                };
+
+                foreach (var layer in sel)
+                {
+                    var result = _engine.Layers.SetLayerLineWeight(layer.Name, lw);
+                    if (result.Success) successCount++;
+                    else { failCount++; lastError = result.Message; }
+                }
+            }
 
             RefreshLayerList();
+
+            _suppressSelectionChanged = true;
+            GridLayers.SelectedItems.Clear();
+            foreach (var item in GridLayers.Items.OfType<SimpleLayerItem>())
+            {
+                if (selectedNames.Contains(item.Name))
+                    GridLayers.SelectedItems.Add(item);
+            }
+            _suppressSelectionChanged = false;
 
             if (failCount > 0)
             {
