@@ -916,6 +916,11 @@ namespace BS.CAD.Tools.Engine.Layer
 
             try
             {
+                int frozenCount = 0;
+                int skipCount = 0;
+                int failCount = 0;
+                string lastError = "";
+
                 using (doc.LockDocument())
                 using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
                 {
@@ -928,16 +933,35 @@ namespace BS.CAD.Tools.Engine.Layer
                     ObjectId currentLayerId = doc.Database.Clayer;
                     foreach (ObjectId id in lt)
                     {
-                        var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
-                        if (ltr == null || ltr.IsErased)
-                            continue;
+                        try
+                        {
+                            var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                            if (ltr == null || ltr.IsErased) { skipCount++; continue; }
 
-                        ltr.IsFrozen = id != currentLayerId && !keepLayers.Contains(ltr.Name);
+                            string name = ltr.Name;
+                            if (string.Equals(name, "0", StringComparison.OrdinalIgnoreCase)) { skipCount++; continue; }
+                            if (string.Equals(name, "Defpoints", StringComparison.OrdinalIgnoreCase)) { skipCount++; continue; }
+                            if (id == currentLayerId) { skipCount++; continue; }
+                            if (keepLayers.Contains(name)) { skipCount++; continue; }
+
+                            ltr.IsFrozen = true;
+                            frozenCount++;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex);
+                            failCount++;
+                            lastError = ex.Message;
+                        }
                     }
 
                     tr.Commit();
                 }
-                return new LayerOperationResult { Success = true, Message = "已冻结其他图层。" };
+
+                string msg = $"已冻结 {frozenCount} 个图层，跳过 {skipCount} 个";
+                if (failCount > 0) msg += $"，{failCount} 个失败";
+                msg += "。";
+                return new LayerOperationResult { Success = true, Message = msg };
             }
             catch (Exception ex)
             {
@@ -967,6 +991,11 @@ namespace BS.CAD.Tools.Engine.Layer
 
             try
             {
+                int lockedCount = 0;
+                int skipCount = 0;
+                int failCount = 0;
+                string lastError = "";
+
                 using (doc.LockDocument())
                 using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
                 {
@@ -976,18 +1005,38 @@ namespace BS.CAD.Tools.Engine.Layer
                         return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
                     }
 
+                    ObjectId currentLayerId = doc.Database.Clayer;
                     foreach (ObjectId id in lt)
                     {
-                        var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
-                        if (ltr == null || ltr.IsErased)
-                            continue;
+                        try
+                        {
+                            var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                            if (ltr == null || ltr.IsErased) { skipCount++; continue; }
 
-                        ltr.IsLocked = !keepLayers.Contains(ltr.Name);
+                            string name = ltr.Name;
+                            if (string.Equals(name, "0", StringComparison.OrdinalIgnoreCase)) { skipCount++; continue; }
+                            if (string.Equals(name, "Defpoints", StringComparison.OrdinalIgnoreCase)) { skipCount++; continue; }
+                            if (id == currentLayerId) { skipCount++; continue; }
+                            if (keepLayers.Contains(name)) { skipCount++; continue; }
+
+                            ltr.IsLocked = true;
+                            lockedCount++;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex);
+                            failCount++;
+                            lastError = ex.Message;
+                        }
                     }
 
                     tr.Commit();
                 }
-                return new LayerOperationResult { Success = true, Message = "已锁定其他图层。" };
+
+                string msg = $"已锁定 {lockedCount} 个图层，跳过 {skipCount} 个";
+                if (failCount > 0) msg += $"，{failCount} 个失败";
+                msg += "。";
+                return new LayerOperationResult { Success = true, Message = msg };
             }
             catch (Exception ex)
             {

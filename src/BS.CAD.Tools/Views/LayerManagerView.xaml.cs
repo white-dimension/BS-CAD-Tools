@@ -1527,14 +1527,13 @@ namespace BS.CAD.Tools.Views
         {
             var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Select(x => x.Name).ToHashSet();
             if (sel.Count == 0) return;
+            var selectedNames = CaptureSelectedLayerNames();
             var result = _engine.Layers.FreezeOtherLayers(sel);
+            TxtStatus.Text = result.Message;
             if (!result.Success)
-            {
-                TxtStatus.Text = result.Message;
                 AcadApp.ShowAlertDialog(result.Message);
-                return;
-            }
             RefreshLayerList();
+            RestoreSelectedLayers(selectedNames);
             AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
         }
 
@@ -1542,14 +1541,13 @@ namespace BS.CAD.Tools.Views
         {
             var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Select(x => x.Name).ToHashSet();
             if (sel.Count == 0) return;
+            var selectedNames = CaptureSelectedLayerNames();
             var result = _engine.Layers.LockOtherLayers(sel);
+            TxtStatus.Text = result.Message;
             if (!result.Success)
-            {
-                TxtStatus.Text = result.Message;
                 AcadApp.ShowAlertDialog(result.Message);
-                return;
-            }
             RefreshLayerList();
+            RestoreSelectedLayers(selectedNames);
             AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
         }
 
