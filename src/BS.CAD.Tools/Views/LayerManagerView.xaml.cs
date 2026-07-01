@@ -1470,35 +1470,18 @@ namespace BS.CAD.Tools.Views
             if (targets.Count == 0) { AcadApp.ShowAlertDialog("没有可用的目标图层。"); return; }
             string? target = InputDialog.Select("合并图层", "选择目标图层：", targets, targets[0]);
             if (string.IsNullOrWhiteSpace(target)) return;
-            if (System.Windows.MessageBox.Show($"将把 {sel.Count} 个源图层中的对象迁移到：{target}\n\n注意：该操作会修改块内对象图层，并尝试删除源图层。建议先保存图纸。是否继续？", "CAD助手 - 合并图层确认", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            int moved = 0;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            if (System.Windows.MessageBox.Show($"将把 {sel.Count} 个源图层中的对象迁移到：{target}\n\n本次不会删除源图层。\n建议先保存图纸。是否继续？", "CAD助手 - 合并图层确认", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+
+            var result = _engine.Layers.MoveEntitiesToLayer(sel.Select(s => s.Name), target);
+            if (!result.Success)
             {
-                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                ObjectId targetId = lt![target];
-                var bt = tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead) as BlockTable;
-                foreach (ObjectId btrId in bt!)
-                {
-                    var btr = tr.GetObject(btrId, OpenMode.ForRead) as BlockTableRecord;
-                    foreach (ObjectId entId in btr!)
-                    {
-                        var ent = tr.GetObject(entId, OpenMode.ForWrite) as Entity;
-                        if (ent != null && sel.Any(s => s.Name == ent.Layer))
-                        { ent.LayerId = targetId; moved++; }
-                    }
-                }
-                foreach (var s in sel)
-                {
-                    if (s.IsCurrent) continue;
-                    try { var ltr = tr.GetObject(lt[s.Name], OpenMode.ForWrite) as LayerTableRecord; ltr?.Erase(); } catch { }
-                }
-                tr.Commit();
+                TxtStatus.Text = result.Message;
+                AcadApp.ShowAlertDialog(result.Message);
+                return;
             }
+
             RefreshLayerList();
-            TxtStatus.Text = $"已合并 {moved} 个物体到图层 {target}";
+            TxtStatus.Text = result.Message;
         }
 
         private void OnBatchRename(object sender, RoutedEventArgs e)

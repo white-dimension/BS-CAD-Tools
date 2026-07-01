@@ -692,6 +692,104 @@ namespace BS.CAD.Tools.Engine.Layer
             }
         }
 
+        public LayerOperationResult MoveEntitiesToLayer(IEnumerable<string> sourceLayerNames, string targetLayerName)
+        {
+            if (sourceLayerNames == null)
+                return new LayerOperationResult { Success = false, Message = "源图层列表不能为空。" };
+
+            if (string.IsNullOrWhiteSpace(targetLayerName))
+                return new LayerOperationResult { Success = false, Message = "目标图层名不能为空。" };
+
+            var names = new List<string>();
+            foreach (var n in sourceLayerNames)
+            {
+                if (string.IsNullOrWhiteSpace(n)) continue;
+                string trimmed = n.Trim();
+                if (!names.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+                    names.Add(trimmed);
+            }
+
+            if (names.Count == 0)
+                return new LayerOperationResult { Success = false, Message = "没有可迁移的源图层。" };
+
+            if (names.Contains(targetLayerName, StringComparer.OrdinalIgnoreCase))
+                return new LayerOperationResult { Success = false, Message = "目标图层不能包含在源图层列表中。" };
+
+            if (names.Contains("0", StringComparer.OrdinalIgnoreCase))
+                return new LayerOperationResult { Success = false, Message = "不能合并 0 图层。" };
+
+            if (names.Contains("Defpoints", StringComparer.OrdinalIgnoreCase))
+                return new LayerOperationResult { Success = false, Message = "不建议合并 Defpoints 图层。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                int movedCount = 0;
+
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null)
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
+
+                    if (!lt.Has(targetLayerName))
+                        return new LayerOperationResult { Success = false, Message = $"目标图层 '{targetLayerName}' 不存在。" };
+
+                    foreach (var name in names)
+                    {
+                        if (!lt.Has(name))
+                            return new LayerOperationResult { Success = false, Message = $"源图层 '{name}' 不存在。" };
+                    }
+
+                    ObjectId targetId = lt[targetLayerName];
+
+                    var sourceSet = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+
+                    BlockTable? bt = tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead) as BlockTable;
+                    if (bt == null)
+                        return new LayerOperationResult { Success = false, Message = "无法打开块表。" };
+
+                    foreach (ObjectId btrId in bt)
+                    {
+                        var btr = tr.GetObject(btrId, OpenMode.ForRead) as BlockTableRecord;
+                        if (btr == null) continue;
+                        if (btr.IsFromExternalReference) continue;
+                        if (btr.IsDependent) continue;
+                        if (btr.IsAnonymous) continue;
+
+                        foreach (ObjectId entId in btr)
+                        {
+                            var ent = tr.GetObject(entId, OpenMode.ForWrite) as Entity;
+                            if (ent == null) continue;
+                            if (ent is Viewport) continue;
+                            if (sourceSet.Contains(ent.Layer))
+                            {
+                                ent.LayerId = targetId;
+                                movedCount++;
+                            }
+                        }
+                    }
+
+                    tr.Commit();
+                }
+
+                return new LayerOperationResult
+                {
+                    Success = true,
+                    Message = $"已将 {movedCount} 个对象移动到图层 {targetLayerName}。源图层未删除。"
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"合并图层失败: {ex.Message}" };
+            }
+        }
+
         public LayerOperationResult IsolateLayers(IEnumerable<string> layerNames)
         {
             if (layerNames == null)
