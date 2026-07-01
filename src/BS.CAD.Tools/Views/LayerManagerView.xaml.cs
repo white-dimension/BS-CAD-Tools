@@ -1219,11 +1219,23 @@ namespace BS.CAD.Tools.Views
 
             if (linetypes.Count == 0)
             {
-                AcadApp.ShowAlertDialog("当前图纸没有可用线型。");
+                AcadApp.ShowAlertDialog("当前图纸没有可用线型，请先加载线型。");
                 return;
             }
 
-            var sorted = linetypes.OrderBy(x => x).ToList();
+            var sorted = linetypes
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Where(x => !string.Equals(x, "ByLayer", StringComparison.OrdinalIgnoreCase))
+                .Where(x => !string.Equals(x, "ByBlock", StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToList();
+
+            if (sorted.Count == 0)
+            {
+                AcadApp.ShowAlertDialog("当前图纸没有可用线型，请先加载线型。");
+                return;
+            }
             string? newLt = InputDialog.Select("修改线型", "选择线型：", sorted, i.Linetype);
             if (string.IsNullOrWhiteSpace(newLt)) return;
 

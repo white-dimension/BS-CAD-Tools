@@ -422,6 +422,10 @@ namespace BS.CAD.Tools.Engine.Layer
             if (string.IsNullOrWhiteSpace(linetypeName))
                 return new LayerOperationResult { Success = false, Message = "线型名不能为空。" };
 
+            if (string.Equals(linetypeName, "ByLayer", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(linetypeName, "ByBlock", StringComparison.OrdinalIgnoreCase))
+                return new LayerOperationResult { Success = false, Message = "图层线型不能设置为 ByLayer 或 ByBlock，请选择具体线型。" };
+
             Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
             if (doc == null)
                 return new LayerOperationResult { Success = false, Message = "无活动文档。" };
@@ -437,16 +441,21 @@ namespace BS.CAD.Tools.Engine.Layer
                         return new LayerOperationResult { Success = false, Message = "图层不存在。" };
                     }
 
-                    LinetypeTable? linetypeTable = tr.GetObject(doc.Database.LinetypeTableId, OpenMode.ForRead) as LinetypeTable;
-                    if (linetypeTable == null || !linetypeTable.Has(linetypeName))
-                    {
-                        return new LayerOperationResult { Success = false, Message = $"线型 '{linetypeName}' 不存在。" };
-                    }
-
                     var ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite) as LayerTableRecord;
                     if (ltr == null)
                     {
                         return new LayerOperationResult { Success = false, Message = "无法打开图层记录。" };
+                    }
+
+                    if (ltr.IsLocked)
+                    {
+                        return new LayerOperationResult { Success = false, Message = $"图层 '{layerName}' 已锁定，无法修改线型。" };
+                    }
+
+                    LinetypeTable? linetypeTable = tr.GetObject(doc.Database.LinetypeTableId, OpenMode.ForRead) as LinetypeTable;
+                    if (linetypeTable == null || !linetypeTable.Has(linetypeName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = $"线型 '{linetypeName}' 未加载到当前图纸。请先加载线型。" };
                     }
 
                     ltr.LinetypeObjectId = linetypeTable[linetypeName];
