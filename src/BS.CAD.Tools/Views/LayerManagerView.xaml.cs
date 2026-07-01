@@ -1026,18 +1026,6 @@ namespace BS.CAD.Tools.Views
 
         private void OnToggleSettings(object sender, RoutedEventArgs e) => GridSettings.Visibility = (GridSettings.Visibility == System.Windows.Visibility.Visible) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
-        private void ExecuteLayerAction(string n, Action<LayerTableRecord> a)
-        {
-            var doc = GetActiveDocument(false);
-            if (doc == null) return;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction()) {
-                LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                if (lt != null && lt.Has(n) && tr.GetObject(lt[n], OpenMode.ForWrite) is LayerTableRecord ltr) a(ltr);
-                tr.Commit();
-            }
-        }
-
         private Document? GetActiveDocument(bool showMessage = true)
         {
             var doc = AcadApp.DocumentManager.MdiActiveDocument;
@@ -1083,7 +1071,12 @@ namespace BS.CAD.Tools.Views
                     string layerName = item.Name;
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        ExecuteLayerAction(layerName, ltr => ltr.Description = newDesc);
+                        var op = _engine.Layers.SetLayerDescription(layerName, newDesc);
+                        if (!op.Success)
+                        {
+                            TxtStatus.Text = op.Message;
+                            AcadApp.ShowAlertDialog(op.Message);
+                        }
                     }));
                     item.Description = newDesc;
                 }
@@ -1099,10 +1092,14 @@ namespace BS.CAD.Tools.Views
 
             if (byte.TryParse(input, out byte alpha) && alpha <= 90)
             {
-                ExecuteLayerAction(i.Name, ltr =>
+                var op = _engine.Layers.SetLayerTransparency(i.Name, alpha);
+                if (!op.Success)
                 {
-                    ltr.Transparency = new Autodesk.AutoCAD.Colors.Transparency(alpha);
-                });
+                    TxtStatus.Text = op.Message;
+                    AcadApp.ShowAlertDialog(op.Message);
+                    return;
+                }
+
                 RefreshLayerList();
             }
             else
@@ -1117,7 +1114,6 @@ namespace BS.CAD.Tools.Views
             if (i == null) return;
 
             var linetypes = new System.Collections.Generic.List<string>();
-            ObjectId targetLtId = ObjectId.Null;
             var doc = AcadApp.DocumentManager.MdiActiveDocument;
 
             try
@@ -1143,27 +1139,14 @@ namespace BS.CAD.Tools.Views
             string? newLt = InputDialog.Select("修改线型", "选择线型：", sorted, i.Linetype);
             if (string.IsNullOrWhiteSpace(newLt) || newLt == i.Linetype) return;
 
-            try
+            var op = _engine.Layers.SetLayerLinetype(i.Name, newLt);
+            if (!op.Success)
             {
-                using (doc.LockDocument())
-                using (var tr = doc.Database.TransactionManager.StartTransaction())
-                {
-                    var ltt = tr.GetObject(doc.Database.LinetypeTableId, OpenMode.ForRead) as LinetypeTable;
-                    if (ltt != null && ltt.Has(newLt))
-                        targetLtId = ltt[newLt];
-                    tr.Commit();
-                }
-            }
-            catch (System.Exception ex) { Logger.Error(ex); }
-
-            if (targetLtId.IsNull)
-            {
-                AcadApp.ShowAlertDialog($"线型 '{newLt}' 不存在。");
+                TxtStatus.Text = op.Message;
+                AcadApp.ShowAlertDialog(op.Message);
                 return;
             }
 
-            var capturedId = targetLtId;
-            ExecuteLayerAction(i.Name, ltr => { ltr.LinetypeObjectId = capturedId; });
             RefreshLayerList();
         }
         private void OnGridDoubleClick(object s, MouseButtonEventArgs e) => OnSetCurrent(s, e);
@@ -1185,7 +1168,14 @@ namespace BS.CAD.Tools.Views
             var result = ColorPickerDialog.Show(current);
             if (result != null)
             {
-                ExecuteLayerAction(i.Name, ltr => ltr.Color = result);
+                var op = _engine.Layers.SetLayerColor(i.Name, result);
+                if (!op.Success)
+                {
+                    TxtStatus.Text = op.Message;
+                    AcadApp.ShowAlertDialog(op.Message);
+                    return;
+                }
+
                 RefreshLayerList();
             }
         }
@@ -1239,29 +1229,30 @@ namespace BS.CAD.Tools.Views
 
             try
             {
-                var doc = GetActiveDocument();
-                if (doc == null) return;
-                using (doc.LockDocument())
-                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                if (nameChanged)
                 {
-                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                    if (lt != null && lt.Has(item.Name) && (!nameChanged || !lt.Has(newName)))
+                    var op = _engine.Layers.RenameLayer(item.Name, newName);
+                    if (!op.Success)
                     {
-                        var ltr = tr.GetObject(lt[item.Name], OpenMode.ForWrite) as LayerTableRecord;
-                        if (ltr != null)
-                        {
-                            if (nameChanged) ltr.Name = newName;
-                            if (descChanged) ltr.Description = newDescription;
-                        }
-                        tr.Commit();
-                        RefreshLayerList();
-                    }
-                    else
-                    {
-                        tr.Commit();
-                        AcadApp.ShowAlertDialog(lt != null && lt.Has(newName) ? "图层名称已存在。" : "无法重命名图层。");
+                        TxtStatus.Text = op.Message;
+                        AcadApp.ShowAlertDialog(op.Message);
+                        return;
                     }
                 }
+
+                string targetName = nameChanged ? newName : item.Name;
+                if (descChanged)
+                {
+                    var op = _engine.Layers.SetLayerDescription(targetName, newDescription);
+                    if (!op.Success)
+                    {
+                        TxtStatus.Text = op.Message;
+                        AcadApp.ShowAlertDialog(op.Message);
+                        return;
+                    }
+                }
+
+                RefreshLayerList();
             }
             catch (System.Exception ex)
             {
@@ -1373,32 +1364,24 @@ namespace BS.CAD.Tools.Views
         private void OnSnapshotLoad(object sender, RoutedEventArgs e)
         {
             if (_snapshot == null || _snapshot.Count == 0) { AcadApp.ShowAlertDialog("没有保存的状态快照。"); return; }
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            var curLayerId = doc.Database.Clayer;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            var states = _snapshot.Select(kv => new LayerSnapshotStateDto
             {
-                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                foreach (var kv in _snapshot)
-                {
-                    if (lt != null && lt.Has(kv.Key))
-                    {
-                        var ltr = tr.GetObject(lt[kv.Key], OpenMode.ForWrite) as LayerTableRecord;
-                        if (ltr != null)
-                        {
-                            if (ltr.ObjectId != curLayerId) // 当前图层不能关闭/冻结
-                            {
-                                ltr.IsOff = !kv.Value.on;
-                                ltr.IsFrozen = kv.Value.frozen;
-                            }
-                            ltr.IsLocked = kv.Value.locked;
-                        }
-                    }
-                }
-                tr.Commit();
+                Name = kv.Key,
+                IsOn = kv.Value.on,
+                IsFrozen = kv.Value.frozen,
+                IsLocked = kv.Value.locked
+            }).ToList();
+
+            var result = _engine.Layers.RestoreLayerSnapshot(states);
+            if (!result.Success)
+            {
+                TxtStatus.Text = result.Message;
+                AcadApp.ShowAlertDialog(result.Message);
+                return;
             }
+
             RefreshLayerList();
+            AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
             TxtStatus.Text = $"已恢复 {_snapshot.Count} 个图层的状态";
         }
 
@@ -1407,40 +1390,29 @@ namespace BS.CAD.Tools.Views
         {
             var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Select(x => x.Name).ToHashSet();
             if (sel.Count == 0) return;
-            var curLayer = _cacheList.FirstOrDefault(x => x.IsCurrent)?.Name ?? "";
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            var result = _engine.Layers.IsolateLayers(sel);
+            if (!result.Success)
             {
-                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                foreach (ObjectId id in lt!)
-                {
-                    var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
-                    if (ltr != null && !ltr.IsErased && ltr.Name != curLayer) ltr.IsOff = !sel.Contains(ltr.Name);
-                }
-                tr.Commit();
+                TxtStatus.Text = result.Message;
+                AcadApp.ShowAlertDialog(result.Message);
+                return;
             }
             RefreshLayerList();
+            AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
             TxtStatus.Text = $"已隔离 {sel.Count} 个图层（右键可取消隔离）";
         }
 
         private void OnUnIsolate(object sender, RoutedEventArgs e)
         {
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            var result = _engine.Layers.UnisolateLayers();
+            if (!result.Success)
             {
-                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                foreach (ObjectId id in lt!)
-                {
-                    var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
-                    if (ltr != null && !ltr.IsErased) ltr.IsOff = false;
-                }
-                tr.Commit();
+                TxtStatus.Text = result.Message;
+                AcadApp.ShowAlertDialog(result.Message);
+                return;
             }
             RefreshLayerList();
+            AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
             TxtStatus.Text = "已取消隔离，全部图层开启";
         }
 
@@ -1448,42 +1420,30 @@ namespace BS.CAD.Tools.Views
         {
             var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Select(x => x.Name).ToHashSet();
             if (sel.Count == 0) return;
-            var curLayer = _cacheList.FirstOrDefault(x => x.IsCurrent)?.Name ?? "";
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            var result = _engine.Layers.FreezeOtherLayers(sel);
+            if (!result.Success)
             {
-                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                foreach (ObjectId id in lt!)
-                {
-                    var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
-                    if (ltr != null && !ltr.IsErased && ltr.Name != curLayer)
-                        ltr.IsFrozen = !sel.Contains(ltr.Name);
-                }
-                tr.Commit();
+                TxtStatus.Text = result.Message;
+                AcadApp.ShowAlertDialog(result.Message);
+                return;
             }
             RefreshLayerList();
+            AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
         }
 
         private void OnLockOthers(object sender, RoutedEventArgs e)
         {
             var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().Select(x => x.Name).ToHashSet();
             if (sel.Count == 0) return;
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            var result = _engine.Layers.LockOtherLayers(sel);
+            if (!result.Success)
             {
-                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                foreach (ObjectId id in lt!)
-                {
-                    var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
-                    if (ltr != null && !ltr.IsErased) ltr.IsLocked = !sel.Contains(ltr.Name);
-                }
-                tr.Commit();
+                TxtStatus.Text = result.Message;
+                AcadApp.ShowAlertDialog(result.Message);
+                return;
             }
             RefreshLayerList();
+            AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
         }
 
         private void OnSelectObjects(object sender, RoutedEventArgs e)
@@ -1552,32 +1512,44 @@ namespace BS.CAD.Tools.Views
             else if (mode == "添加后缀") arg = InputDialog.Show("批量改名 - 添加后缀", "输入后缀：");
             else { arg = InputDialog.Show("批量改名 - 查找替换", "查找文字："); arg2 = InputDialog.Show("批量改名 - 查找替换", "替换为："); }
             if (string.IsNullOrWhiteSpace(arg)) return;
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            int renamed = 0;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction())
+            int successCount = 0;
+            int failCount = 0;
+            int skippedCount = 0;
+            string lastError = "";
+
+            foreach (var s in sel)
             {
-                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                foreach (var s in sel)
+                string newName = mode switch
                 {
-                    string newName = mode switch
-                    {
-                        "添加前缀" => arg + s.Name,
-                        "添加后缀" => s.Name + arg,
-                        "查找替换" => s.Name.Replace(arg ?? "", arg2 ?? ""),
-                        _ => s.Name
-                    };
-                    if (newName != s.Name && lt != null && lt.Has(s.Name) && !lt.Has(newName))
-                    {
-                        var ltr = tr.GetObject(lt[s.Name], OpenMode.ForWrite) as LayerTableRecord;
-                        if (ltr != null) { ltr.Name = newName; renamed++; }
-                    }
+                    "\u6dfb\u52a0\u524d\u7f00" => arg + s.Name,
+                    "\u6dfb\u52a0\u540e\u7f00" => s.Name + arg,
+                    "\u67e5\u627e\u66ff\u6362" => s.Name.Replace(arg ?? "", arg2 ?? ""),
+                    _ => s.Name
+                };
+
+                if (newName == s.Name)
+                {
+                    skippedCount++;
+                    continue;
                 }
-                tr.Commit();
+
+                var result = _engine.Layers.RenameLayer(s.Name, newName);
+                if (result.Success)
+                {
+                    successCount++;
+                }
+                else
+                {
+                    failCount++;
+                    lastError = result.Message;
+                }
             }
             RefreshLayerList();
-            TxtStatus.Text = $"已重命名 {renamed} 个图层";
+            TxtStatus.Text = $"\u5df2\u91cd\u547d\u540d {successCount} \u4e2a\u56fe\u5c42";
+            if (failCount > 0)
+            {
+                AcadApp.ShowAlertDialog($"\u6279\u91cf\u91cd\u547d\u540d\u5931\u8d25 {failCount} \u4e2a\uff0c\u8df3\u8fc7 {skippedCount} \u4e2a\u3002\n\u6700\u540e\u4e00\u6761\u9519\u8bef: {lastError}");
+            }
         }
 
         // ── Batch Edit ──
@@ -1674,7 +1646,14 @@ namespace BS.CAD.Tools.Views
                 "1.58" => LineWeight.LineWeight158, "2.00" => LineWeight.LineWeight200, "2.11" => LineWeight.LineWeight211,
                 _ => LineWeight.ByLineWeightDefault
             };
-            ExecuteLayerAction(i.Name, ltr => ltr.LineWeight = lw);
+            var op = _engine.Layers.SetLayerLineWeight(i.Name, lw);
+            if (!op.Success)
+            {
+                TxtStatus.Text = op.Message;
+                AcadApp.ShowAlertDialog(op.Message);
+                return;
+            }
+
             RefreshLayerList();
         }
 

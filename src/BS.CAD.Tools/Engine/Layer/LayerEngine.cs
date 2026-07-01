@@ -373,6 +373,523 @@ namespace BS.CAD.Tools.Engine.Layer
             }
         }
 
+        public LayerOperationResult SetLayerColor(string layerName, Autodesk.AutoCAD.Colors.Color color)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            if (color == null)
+                return new LayerOperationResult { Success = false, Message = "图层颜色不能为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    var ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层记录。" };
+                    }
+
+                    ltr.Color = color;
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "图层颜色已修改。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"操作失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult SetLayerLinetype(string layerName, string linetypeName)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            if (string.IsNullOrWhiteSpace(linetypeName))
+                return new LayerOperationResult { Success = false, Message = "线型名不能为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    LinetypeTable? linetypeTable = tr.GetObject(doc.Database.LinetypeTableId, OpenMode.ForRead) as LinetypeTable;
+                    if (linetypeTable == null || !linetypeTable.Has(linetypeName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = $"线型 '{linetypeName}' 不存在。" };
+                    }
+
+                    var ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层记录。" };
+                    }
+
+                    ltr.LinetypeObjectId = linetypeTable[linetypeName];
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "图层线型已修改。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"操作失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult SetLayerLineWeight(string layerName, LineWeight lineWeight)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    var ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层记录。" };
+                    }
+
+                    ltr.LineWeight = lineWeight;
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "图层线宽已修改。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"操作失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult SetLayerTransparency(string layerName, byte transparency)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            if (transparency > 90)
+                return new LayerOperationResult { Success = false, Message = "透明度必须在 0-90 之间。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    var ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层记录。" };
+                    }
+
+                    ltr.Transparency = new Autodesk.AutoCAD.Colors.Transparency(transparency);
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "图层透明度已修改。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"操作失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult RenameLayer(string oldName, string newName)
+        {
+            if (string.IsNullOrWhiteSpace(oldName))
+                return new LayerOperationResult { Success = false, Message = "原图层名不能为空。" };
+
+            if (string.IsNullOrWhiteSpace(newName))
+                return new LayerOperationResult { Success = false, Message = "新图层名不能为空。" };
+
+            if (oldName == newName)
+                return new LayerOperationResult { Success = true, Message = "名称未变化。" };
+
+            if (oldName == "0")
+                return new LayerOperationResult { Success = false, Message = "不能重命名 0 图层。" };
+
+            if (string.Equals(oldName, "Defpoints", StringComparison.OrdinalIgnoreCase))
+                return new LayerOperationResult { Success = false, Message = "不建议重命名 Defpoints 图层。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(oldName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "原图层不存在。" };
+                    }
+
+                    if (lt.Has(newName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层名称已存在。" };
+                    }
+
+                    var ltr = tr.GetObject(lt[oldName], OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层记录。" };
+                    }
+
+                    ltr.Name = newName;
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "图层已重命名。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"重命名失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult SetLayerDescription(string layerName, string description)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    var ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层记录。" };
+                    }
+
+                    ltr.Description = description ?? string.Empty;
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "图层说明已修改。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"操作失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult IsolateLayers(IEnumerable<string> layerNames)
+        {
+            if (layerNames == null)
+                return new LayerOperationResult { Success = false, Message = "图层列表不能为空。" };
+
+            var visibleLayers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string layerName in layerNames)
+            {
+                if (!string.IsNullOrWhiteSpace(layerName))
+                    visibleLayers.Add(layerName);
+            }
+
+            if (visibleLayers.Count == 0)
+                return new LayerOperationResult { Success = false, Message = "请先选择要隔离的图层。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
+                    }
+
+                    ObjectId currentLayerId = doc.Database.Clayer;
+                    foreach (ObjectId id in lt)
+                    {
+                        var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                        if (ltr == null || ltr.IsErased)
+                            continue;
+
+                        ltr.IsOff = id != currentLayerId && !visibleLayers.Contains(ltr.Name);
+                    }
+
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "图层已隔离。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"隔离失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult UnisolateLayers()
+        {
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
+                    }
+
+                    foreach (ObjectId id in lt)
+                    {
+                        var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                        if (ltr != null && !ltr.IsErased)
+                        {
+                            ltr.IsOff = false;
+                        }
+                    }
+
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "已取消隔离。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"取消隔离失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult FreezeOtherLayers(IEnumerable<string> layerNames)
+        {
+            if (layerNames == null)
+                return new LayerOperationResult { Success = false, Message = "图层列表不能为空。" };
+
+            var keepLayers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string layerName in layerNames)
+            {
+                if (!string.IsNullOrWhiteSpace(layerName))
+                    keepLayers.Add(layerName);
+            }
+
+            if (keepLayers.Count == 0)
+                return new LayerOperationResult { Success = false, Message = "请先选择保留不冻结的图层。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
+                    }
+
+                    ObjectId currentLayerId = doc.Database.Clayer;
+                    foreach (ObjectId id in lt)
+                    {
+                        var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                        if (ltr == null || ltr.IsErased)
+                            continue;
+
+                        ltr.IsFrozen = id != currentLayerId && !keepLayers.Contains(ltr.Name);
+                    }
+
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "已冻结其他图层。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"冻结其他图层失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult LockOtherLayers(IEnumerable<string> layerNames)
+        {
+            if (layerNames == null)
+                return new LayerOperationResult { Success = false, Message = "图层列表不能为空。" };
+
+            var keepLayers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string layerName in layerNames)
+            {
+                if (!string.IsNullOrWhiteSpace(layerName))
+                    keepLayers.Add(layerName);
+            }
+
+            if (keepLayers.Count == 0)
+                return new LayerOperationResult { Success = false, Message = "请先选择保留不锁定的图层。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
+                    }
+
+                    foreach (ObjectId id in lt)
+                    {
+                        var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                        if (ltr == null || ltr.IsErased)
+                            continue;
+
+                        ltr.IsLocked = !keepLayers.Contains(ltr.Name);
+                    }
+
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = "已锁定其他图层。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"锁定其他图层失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult RestoreLayerSnapshot(IEnumerable<LayerSnapshotStateDto> states)
+        {
+            if (states == null)
+                return new LayerOperationResult { Success = false, Message = "快照状态不能为空。" };
+
+            List<LayerSnapshotStateDto> stateList = states
+                .Where(state => state != null && !string.IsNullOrWhiteSpace(state.Name))
+                .ToList();
+
+            if (stateList.Count == 0)
+                return new LayerOperationResult { Success = false, Message = "快照状态为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            int restored = 0;
+            int skipped = 0;
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null)
+                    {
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
+                    }
+
+                    ObjectId currentLayerId = doc.Database.Clayer;
+                    foreach (LayerSnapshotStateDto state in stateList)
+                    {
+                        if (!lt.Has(state.Name))
+                        {
+                            skipped++;
+                            continue;
+                        }
+
+                        var ltr = tr.GetObject(lt[state.Name], OpenMode.ForWrite) as LayerTableRecord;
+                        if (ltr == null)
+                        {
+                            skipped++;
+                            continue;
+                        }
+
+                        ltr.IsOff = !state.IsOn;
+                        ltr.IsLocked = state.IsLocked;
+                        ltr.IsFrozen = ltr.ObjectId == currentLayerId ? false : state.IsFrozen;
+                        restored++;
+                    }
+
+                    tr.Commit();
+                }
+
+                return new LayerOperationResult
+                {
+                    Success = true,
+                    Message = $"已恢复 {restored} 个图层状态，跳过 {skipped} 个。"
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"恢复快照失败: {ex.Message}" };
+            }
+        }
+
         private static string ResolveLinetypeName(Transaction tr, LayerTableRecord layer)
         {
             if (layer.LinetypeObjectId.IsNull)
