@@ -1564,24 +1564,26 @@ namespace BS.CAD.Tools.Views
 
             var doc = GetActiveDocument();
             if (doc == null) return;
+
+            int successCount = 0;
+            int failCount = 0;
+            string lastError = "";
+
             if (mode == "颜色")
             {
                 var c = ColorPickerDialog.Show(AcColor.FromColorIndex(ColorMethod.ByAci, sel[0].ColorIndex));
                 if (c == null) return;
-                using (doc.LockDocument())
-                using (var tr = doc.Database.TransactionManager.StartTransaction())
+
+                foreach (var layer in sel)
                 {
-                    var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                    foreach (var s in sel)
-                        if (lt != null && lt.Has(s.Name))
-                            ((LayerTableRecord)tr.GetObject(lt[s.Name], OpenMode.ForWrite)).Color = c;
-                    tr.Commit();
+                    var result = _engine.Layers.SetLayerColor(layer.Name, c);
+                    if (result.Success) successCount++;
+                    else { failCount++; lastError = result.Message; }
                 }
             }
             else if (mode == "线型")
             {
                 var linetypes = new List<string>();
-                ObjectId ltId = ObjectId.Null;
                 using (doc.LockDocument())
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
                 {
@@ -1591,36 +1593,42 @@ namespace BS.CAD.Tools.Views
                 }
                 string? lt = InputDialog.Select("批量改属性 - 线型", "选择线型：", linetypes.OrderBy(x => x).ToList(), sel[0].Linetype);
                 if (string.IsNullOrWhiteSpace(lt)) return;
-                using (doc.LockDocument())
-                using (var tr = doc.Database.TransactionManager.StartTransaction())
+
+                foreach (var layer in sel)
                 {
-                    var ltt = tr.GetObject(doc.Database.LinetypeTableId, OpenMode.ForRead) as LinetypeTable;
-                    if (ltt != null && ltt.Has(lt))
-                    {
-                        ltId = ltt[lt];
-                        var lt2 = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                        foreach (var s in sel)
-                            if (lt2 != null && lt2.Has(s.Name))
-                                ((LayerTableRecord)tr.GetObject(lt2[s.Name], OpenMode.ForWrite)).LinetypeObjectId = ltId;
-                    }
-                    tr.Commit();
+                    var result = _engine.Layers.SetLayerLinetype(layer.Name, lt);
+                    if (result.Success) successCount++;
+                    else { failCount++; lastError = result.Message; }
                 }
             }
             else if (mode == "透明度")
             {
                 string? input = InputDialog.Show("批量改属性 - 透明度", "输入 0-90：", preferChineseIme: false);
-                if (string.IsNullOrWhiteSpace(input) || !byte.TryParse(input, out byte alpha) || alpha > 90) return;
-                using (doc.LockDocument())
-                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                if (string.IsNullOrWhiteSpace(input) || !byte.TryParse(input, out byte alpha) || alpha > 90)
                 {
-                    var lt2 = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                    foreach (var s in sel)
-                        if (lt2 != null && lt2.Has(s.Name))
-                            ((LayerTableRecord)tr.GetObject(lt2[s.Name], OpenMode.ForWrite)).Transparency = new Autodesk.AutoCAD.Colors.Transparency(alpha);
-                    tr.Commit();
+                    if (!string.IsNullOrWhiteSpace(input)) AcadApp.ShowAlertDialog("请输入 0-90 之间的数值。");
+                    return;
+                }
+
+                foreach (var layer in sel)
+                {
+                    var result = _engine.Layers.SetLayerTransparency(layer.Name, alpha);
+                    if (result.Success) successCount++;
+                    else { failCount++; lastError = result.Message; }
                 }
             }
+
             RefreshLayerList();
+
+            if (failCount > 0)
+            {
+                TxtStatus.Text = $"批量修改完成，成功 {successCount} 个，失败 {failCount} 个。";
+                AcadApp.ShowAlertDialog($"批量修改失败 {failCount} 个。\n最后一条错误: {lastError}");
+            }
+            else if (successCount > 0)
+            {
+                TxtStatus.Text = $"已批量修改 {successCount} 个图层。";
+            }
         }
 
         // ── Lineweight ──
