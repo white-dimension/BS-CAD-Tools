@@ -192,8 +192,8 @@ namespace BS.CAD.Tools.Views
 
         private void InitSettingsPanel()
         {
-            var labels = new[] { "新建", "当前", "删除", "刷新", "存状态", "读状态", "存模板", "读模板", "导出" };
-            var buttons = new System.Windows.Controls.Button[] { BtnNewLayer, BtnSetCurrent, BtnDeleteLayer, BtnRefresh, BtnSnapshotSave, BtnSnapshotLoad, BtnSaveTemplate, BtnLoadTemplate, BtnExport };
+            var labels = new[] { "新建", "当前", "删除", "刷新", "存模板", "读模板", "导出" };
+            var buttons = new System.Windows.Controls.Button[] { BtnNewLayer, BtnSetCurrent, BtnDeleteLayer, BtnRefresh, BtnSaveTemplate, BtnLoadTemplate, BtnExport };
 
             SettingsStack.Children.Clear();
             for (int i = 0; i < labels.Length; i++)
@@ -282,7 +282,7 @@ namespace BS.CAD.Tools.Views
             for (int i = 0; i < orderedButtons.Count; i++)
             {
                 var button = orderedButtons[i];
-                if ((button.Name == nameof(BtnSnapshotSave) || button.Name == nameof(BtnSettings)) && ToolbarPanel.Children.Count > 0)
+                if (button.Name == nameof(BtnSettings) && ToolbarPanel.Children.Count > 0)
                 {
                     ToolbarPanel.Children.Add(CreateToolbarDivider());
                 }
@@ -1491,41 +1491,6 @@ namespace BS.CAD.Tools.Views
         }
 
 
-
-        // ── Layer Snapshots ──
-        private Dictionary<string, (bool on, bool frozen, bool locked)>? _snapshot;
-
-        private void OnSnapshotSave(object sender, RoutedEventArgs e)
-        {
-            _snapshot = new Dictionary<string, (bool, bool, bool)>();
-            foreach (var item in _cacheList)
-                _snapshot[item.Name] = (item.IsOn, item.IsFrozen, item.IsLocked);
-            TxtStatus.Text = $"已保存 {_snapshot.Count} 个图层的状态快照";
-        }
-
-        private void OnSnapshotLoad(object sender, RoutedEventArgs e)
-        {
-            if (_snapshot == null || _snapshot.Count == 0) { AcadApp.ShowAlertDialog("没有保存的状态快照。"); return; }
-            var states = _snapshot.Select(kv => new LayerSnapshotStateDto
-            {
-                Name = kv.Key,
-                IsOn = kv.Value.on,
-                IsFrozen = kv.Value.frozen,
-                IsLocked = kv.Value.locked
-            }).ToList();
-
-            var result = _engine.Layers.RestoreLayerSnapshot(states);
-            if (!result.Success)
-            {
-                TxtStatus.Text = result.Message;
-                AcadApp.ShowAlertDialog(result.Message);
-                return;
-            }
-
-            RefreshLayerList();
-            AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
-            TxtStatus.Text = $"已恢复 {_snapshot.Count} 个图层的状态";
-        }
 
         // ── Layer Operations ──
         private void OnIsolateLayer(object sender, RoutedEventArgs e)
