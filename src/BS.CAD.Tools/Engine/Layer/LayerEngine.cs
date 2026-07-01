@@ -633,6 +633,66 @@ namespace BS.CAD.Tools.Engine.Layer
             }
         }
 
+        public LayerOperationResult EnsureLayersExist(IEnumerable<string> layerNames)
+        {
+            if (layerNames == null)
+                return new LayerOperationResult { Success = false, Message = "图层名称列表不能为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            int createdCount = 0;
+            int existedCount = 0;
+
+            try
+            {
+                var namesToProcess = new List<string>();
+                foreach (var n in layerNames)
+                    if (!string.IsNullOrWhiteSpace(n) && !namesToProcess.Contains(n))
+                        namesToProcess.Add(n);
+
+                if (namesToProcess.Count == 0)
+                    return new LayerOperationResult { Success = true, Message = "没有需要处理的有效图层名称。" };
+
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null)
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
+
+                    foreach (var name in namesToProcess)
+                    {
+                        if (lt.Has(name))
+                        {
+                            existedCount++;
+                            continue;
+                        }
+
+                        lt.UpgradeOpen();
+                        var ltr = new LayerTableRecord { Name = name };
+                        lt.Add(ltr);
+                        tr.AddNewlyCreatedDBObject(ltr, true);
+                        createdCount++;
+                    }
+
+                    tr.Commit();
+                }
+
+                return new LayerOperationResult
+                {
+                    Success = true,
+                    Message = $"图层确保存在完成：新创建 {createdCount} 个，已存在 {existedCount} 个。"
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"确保图层存在失败: {ex.Message}" };
+            }
+        }
+
         public LayerOperationResult IsolateLayers(IEnumerable<string> layerNames)
         {
             if (layerNames == null)

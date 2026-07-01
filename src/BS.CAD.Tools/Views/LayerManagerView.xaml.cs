@@ -1749,30 +1749,21 @@ namespace BS.CAD.Tools.Views
             {
                 layerNames = System.IO.File.ReadAllLines(path);
             }
-            var doc = GetActiveDocument();
-            if (doc == null) return;
-            int created = 0;
-            using (doc.LockDocument())
-            using (var tr = doc.Database.TransactionManager.StartTransaction())
+
+            var result = _engine.Layers.EnsureLayersExist(layerNames);
+            if (!result.Success)
             {
-                var lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForWrite) as LayerTable;
-                if (lt == null) return;
-                foreach (var nm in layerNames)
-                {
-                    if (lt != null && !lt.Has(nm) && !string.IsNullOrWhiteSpace(nm))
-                    {
-                        var ltr = new LayerTableRecord { Name = nm };
-                        lt.Add(ltr); tr.AddNewlyCreatedDBObject(ltr, true); created++;
-                    }
-                }
-                tr.Commit();
+                TxtStatus.Text = result.Message;
+                AcadApp.ShowAlertDialog(result.Message);
+                return;
             }
+
             ClearCustomFilters();
             foreach (var filter in filters)
                 CreateFilterLabel(filter.Label, filter.LayerNames);
             SetActiveFilterButton(BtnFilterAll);
             RefreshLayerList();
-            TxtStatus.Text = $"已创建 {created} 个图层";
+            TxtStatus.Text = result.Message;
         }
 
         // ── Export ──
