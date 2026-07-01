@@ -81,7 +81,8 @@ namespace BS.CAD.Tools.Views
         private bool _drawingStateLoaded;
         private bool _suppressSelectionChanged;
         private bool _suppressDbSync;
-        private HashSet<string>? _activeGroupLayerNames;
+        // Reserved for Graphic Group Manager.
+        private HashSet<string>? _activeGroupLayerNames = null;
         private System.Windows.Threading.DispatcherTimer? _syncTimer;
         private const string LayerManagerStateKey = "BS_CAD_TOOLS_LAYER_MANAGER_STATE";
 
@@ -108,15 +109,7 @@ namespace BS.CAD.Tools.Views
             InitToolbarDrag();
             InitSettingsPanel();
             LoadLocalUiState();
-            _syncTimer = new System.Windows.Threading.DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(400)
-            };
-            _syncTimer.Tick += (_, _) =>
-            {
-                _syncTimer?.Stop();
-                RefreshLayerList();
-            };
+            EnsureSyncTimer();
             Dispatcher.BeginInvoke(new Action(RefreshLayerList));
             WatchDatabase();
             AcadApp.DocumentManager.DocumentActivated += OnDocumentActivated;
@@ -124,8 +117,12 @@ namespace BS.CAD.Tools.Views
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            _syncTimer?.Stop();
-            _syncTimer = null;
+            if (_syncTimer != null)
+            {
+                _syncTimer.Stop();
+                _syncTimer.Tick -= OnSyncTimerTick;
+                _syncTimer = null;
+            }
             UnwatchDatabase();
             AcadApp.DocumentManager.DocumentActivated -= OnDocumentActivated;
         }
@@ -139,8 +136,25 @@ namespace BS.CAD.Tools.Views
             }
             else
             {
+                _syncTimer?.Stop();
                 UnwatchDatabase();
             }
+        }
+
+        private void EnsureSyncTimer()
+        {
+            if (_syncTimer != null) return;
+            _syncTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(400)
+            };
+            _syncTimer.Tick += OnSyncTimerTick;
+        }
+
+        private void OnSyncTimerTick(object? sender, EventArgs e)
+        {
+            _syncTimer?.Stop();
+            RefreshLayerList();
         }
 
         private void WatchDatabase()
@@ -190,6 +204,7 @@ namespace BS.CAD.Tools.Views
 
         private void ScheduleSync()
         {
+            EnsureSyncTimer();
             _syncTimer?.Stop();
             _syncTimer?.Start();
         }
