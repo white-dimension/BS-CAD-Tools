@@ -636,25 +636,29 @@ namespace BS.CAD.Tools.Engine.Layer
         public LayerOperationResult EnsureLayersExist(IEnumerable<string> layerNames)
         {
             if (layerNames == null)
-                return new LayerOperationResult { Success = false, Message = "图层名称列表不能为空。" };
+                return new LayerOperationResult { Success = false, Message = "图层列表不能为空。" };
+
+            var names = new List<string>();
+            foreach (var n in layerNames)
+            {
+                if (string.IsNullOrWhiteSpace(n)) continue;
+                string trimmed = n.Trim();
+                if (!names.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+                    names.Add(trimmed);
+            }
+
+            if (names.Count == 0)
+                return new LayerOperationResult { Success = false, Message = "没有可创建的图层。" };
 
             Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
             if (doc == null)
                 return new LayerOperationResult { Success = false, Message = "无活动文档。" };
 
             int createdCount = 0;
-            int existedCount = 0;
+            int existsCount = 0;
 
             try
             {
-                var namesToProcess = new List<string>();
-                foreach (var n in layerNames)
-                    if (!string.IsNullOrWhiteSpace(n) && !namesToProcess.Contains(n))
-                        namesToProcess.Add(n);
-
-                if (namesToProcess.Count == 0)
-                    return new LayerOperationResult { Success = true, Message = "没有需要处理的有效图层名称。" };
-
                 using (doc.LockDocument())
                 using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
                 {
@@ -662,34 +666,29 @@ namespace BS.CAD.Tools.Engine.Layer
                     if (lt == null)
                         return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
 
-                    foreach (var name in namesToProcess)
+                    foreach (var name in names)
                     {
                         if (lt.Has(name))
                         {
-                            existedCount++;
-                            continue;
+                            existsCount++;
                         }
-
-                        lt.UpgradeOpen();
-                        var ltr = new LayerTableRecord { Name = name };
-                        lt.Add(ltr);
-                        tr.AddNewlyCreatedDBObject(ltr, true);
-                        createdCount++;
+                        else
+                        {
+                            if (!lt.IsWriteEnabled) lt.UpgradeOpen();
+                            var ltr = new LayerTableRecord { Name = name };
+                            lt.Add(ltr);
+                            tr.AddNewlyCreatedDBObject(ltr, true);
+                            createdCount++;
+                        }
                     }
-
                     tr.Commit();
                 }
-
-                return new LayerOperationResult
-                {
-                    Success = true,
-                    Message = $"图层确保存在完成：新创建 {createdCount} 个，已存在 {existedCount} 个。"
-                };
+                return new LayerOperationResult { Success = true, Message = $"已创建 {createdCount} 个图层，已存在 {existsCount} 个。" };
             }
             catch (Exception ex)
             {
                 Logger.Error(ex);
-                return new LayerOperationResult { Success = false, Message = $"确保图层存在失败: {ex.Message}" };
+                return new LayerOperationResult { Success = false, Message = $"创建图层失败: {ex.Message}" };
             }
         }
 
