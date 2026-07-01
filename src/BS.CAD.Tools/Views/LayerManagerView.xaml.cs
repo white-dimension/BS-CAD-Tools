@@ -1178,7 +1178,8 @@ namespace BS.CAD.Tools.Views
                 targets = new List<SimpleLayerItem> { i };
 
             var linetypes = new System.Collections.Generic.List<string>();
-            var doc = AcadApp.DocumentManager.MdiActiveDocument;
+            var doc = GetActiveDocument();
+            if (doc == null) return;
 
             try
             {
@@ -1742,15 +1743,7 @@ namespace BS.CAD.Tools.Views
             }
 
             RefreshLayerList();
-
-            _suppressSelectionChanged = true;
-            GridLayers.SelectedItems.Clear();
-            foreach (var item in GridLayers.Items.OfType<SimpleLayerItem>())
-            {
-                if (selectedNames.Contains(item.Name))
-                    GridLayers.SelectedItems.Add(item);
-            }
-            _suppressSelectionChanged = false;
+            RestoreSelectedLayers(selectedNames);
 
             if (failCount > 0)
             {
