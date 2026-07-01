@@ -1113,6 +1113,62 @@ namespace BS.CAD.Tools.Engine.Layer
             }
         }
 
+        public LayerOperationResult ThawAllLayers()
+        {
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                int thawedCount = 0;
+                int skipCount = 0;
+                int failCount = 0;
+                string lastError = "";
+
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null)
+                        return new LayerOperationResult { Success = false, Message = "无法打开图层表。" };
+
+                    ObjectId currentLayerId = doc.Database.Clayer;
+                    foreach (ObjectId id in lt)
+                    {
+                        try
+                        {
+                            var ltr = tr.GetObject(id, OpenMode.ForWrite) as LayerTableRecord;
+                            if (ltr == null || ltr.IsErased) { skipCount++; continue; }
+                            if (!ltr.IsFrozen) { skipCount++; continue; }
+                            if (id == currentLayerId) { skipCount++; continue; }
+
+                            ltr.IsFrozen = false;
+                            thawedCount++;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex);
+                            failCount++;
+                            lastError = ex.Message;
+                        }
+                    }
+
+                    tr.Commit();
+                }
+
+                string msg = $"已解冻 {thawedCount} 个图层，跳过 {skipCount} 个";
+                if (failCount > 0) msg += $"，{failCount} 个失败";
+                msg += "。";
+                return new LayerOperationResult { Success = true, Message = msg };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"全部解冻失败: {ex.Message}" };
+            }
+        }
+
         private static string ResolveLinetypeName(Transaction tr, LayerTableRecord layer)
         {
             if (layer.LinetypeObjectId.IsNull)

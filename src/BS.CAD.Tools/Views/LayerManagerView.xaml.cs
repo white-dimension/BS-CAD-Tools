@@ -660,7 +660,7 @@ namespace BS.CAD.Tools.Views
 
             var header = FindVisualParent<DataGridColumnHeader>(e.OriginalSource as DependencyObject);
             var pos = e.GetPosition(GridLayers);
-            if (header != null || pos.Y <= 72)
+            if (header != null || pos.Y <= 60)
             {
                 if (TryFindResource("HeaderContextMenu") is System.Windows.Controls.ContextMenu menu)
                 {
@@ -1236,7 +1236,11 @@ namespace BS.CAD.Tools.Views
                 AcadApp.ShowAlertDialog("当前图纸没有可用线型，请先加载线型。");
                 return;
             }
-            string? newLt = InputDialog.Select("修改线型", "选择线型：", sorted, i.Linetype);
+
+            string ltPrompt = sorted.Count == 1 && string.Equals(sorted[0], "Continuous", StringComparison.OrdinalIgnoreCase)
+                ? "选择线型（当前仅 Continuous，如需虚线/中心线请先在线型管理器中加载）："
+                : "选择线型：";
+            string? newLt = InputDialog.Select("修改线型", ltPrompt, sorted, i.Linetype);
             if (string.IsNullOrWhiteSpace(newLt)) return;
 
             var selectedNames = CaptureSelectedLayerNames();
@@ -1548,6 +1552,16 @@ namespace BS.CAD.Tools.Views
                 AcadApp.ShowAlertDialog(result.Message);
             RefreshLayerList();
             RestoreSelectedLayers(selectedNames);
+            AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
+        }
+
+        private void OnThawAllLayers(object sender, RoutedEventArgs e)
+        {
+            var result = _engine.Layers.ThawAllLayers();
+            TxtStatus.Text = result.Message;
+            if (!result.Success)
+                AcadApp.ShowAlertDialog(result.Message);
+            RefreshLayerList();
             AcadApp.DocumentManager.MdiActiveDocument?.Editor.Regen();
         }
 

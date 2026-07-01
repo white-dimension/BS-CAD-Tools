@@ -124,7 +124,7 @@
             <ContextMenu x:Key="RowContextMenu" Opened="OnRowContextMenuOpened">
                 <MenuItem x:Name="MiSetCurrent" Header="设为当前图层" Click="OnSetCurrent"/><MenuItem x:Name="MiRenameLayer" Header="重命名 / 说明" Click="OnRenameLayer"/><MenuItem Header="删除选中图层" Click="OnDeleteLayer"/>
                 <Separator x:Name="SepSingleActions"/>
-                <MenuItem Header="隔离图层" Click="OnIsolateLayer"/><MenuItem Header="取消隔离" Click="OnUnIsolate"/><MenuItem Header="冻结其他" Click="OnFreezeOthers"/><MenuItem Header="锁定其他" Click="OnLockOthers"/>
+                <MenuItem Header="隔离图层" Click="OnIsolateLayer"/><MenuItem Header="取消隔离" Click="OnUnIsolate"/><MenuItem Header="冻结其他" Click="OnFreezeOthers"/><MenuItem Header="锁定其他" Click="OnLockOthers"/><MenuItem Header="全部解冻" Click="OnThawAllLayers"/>
                 <Separator/>
                 <MenuItem Header="+ 添加为过滤标签" Click="OnAddFilterFromSelection"/>
                 <Separator/>

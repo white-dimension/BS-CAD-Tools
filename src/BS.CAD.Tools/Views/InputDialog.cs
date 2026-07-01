@@ -82,6 +82,7 @@ namespace BS.CAD.Tools.Views
 
             try { new System.Windows.Interop.WindowInteropHelper(dlg).Owner = AcadApp.MainWindow.Handle; }
             catch { dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen; }
+            dlg.PreviewKeyDown += (s, ke) => { if (ke.Key == System.Windows.Input.Key.Escape) { dlg.DialogResult = false; dlg.Close(); } };
 
             var mainBorder = new System.Windows.Controls.Border { Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(36, 39, 41)), CornerRadius = new System.Windows.CornerRadius(12), BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(61, 69, 75)), BorderThickness = new System.Windows.Thickness(1) };
             var root = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(24) };
@@ -149,6 +150,7 @@ namespace BS.CAD.Tools.Views
 
             try { new System.Windows.Interop.WindowInteropHelper(dlg).Owner = AcadApp.MainWindow.Handle; }
             catch { dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen; }
+            dlg.PreviewKeyDown += (s, ke) => { if (ke.Key == System.Windows.Input.Key.Escape) { dlg.DialogResult = false; dlg.Close(); } };
 
             var mainBorder = new System.Windows.Controls.Border { Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(29, 34, 40)), CornerRadius = new System.Windows.CornerRadius(12), BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(61, 69, 75)), BorderThickness = new System.Windows.Thickness(1) };
             var root = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(28, 20, 28, 18) };
@@ -271,6 +273,7 @@ namespace BS.CAD.Tools.Views
 
             try { new System.Windows.Interop.WindowInteropHelper(dlg).Owner = AcadApp.MainWindow.Handle; }
             catch { dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen; }
+            dlg.PreviewKeyDown += (s, ke) => { if (ke.Key == System.Windows.Input.Key.Escape) { dlg.DialogResult = false; dlg.Close(); } };
 
             var mainBorder = new System.Windows.Controls.Border { Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(36, 39, 41)), CornerRadius = new System.Windows.CornerRadius(12), BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(61, 69, 75)), BorderThickness = new System.Windows.Thickness(1) };
             var root = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(24) };
