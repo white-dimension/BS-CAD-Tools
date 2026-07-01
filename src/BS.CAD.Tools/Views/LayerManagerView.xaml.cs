@@ -84,6 +84,7 @@ namespace BS.CAD.Tools.Views
         // Reserved for Graphic Group Manager.
         private HashSet<string>? _activeGroupLayerNames = null;
         private System.Windows.Threading.DispatcherTimer? _syncTimer;
+        private bool _documentEventsSubscribed;
         private const string LayerManagerStateKey = "BS_CAD_TOOLS_LAYER_MANAGER_STATE";
 
         public LayerManagerView()
@@ -112,7 +113,7 @@ namespace BS.CAD.Tools.Views
             EnsureSyncTimer();
             Dispatcher.BeginInvoke(new Action(RefreshLayerList));
             WatchDatabase();
-            AcadApp.DocumentManager.DocumentActivated += OnDocumentActivated;
+            SubscribeDocumentEvents();
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -124,7 +125,7 @@ namespace BS.CAD.Tools.Views
                 _syncTimer = null;
             }
             UnwatchDatabase();
-            AcadApp.DocumentManager.DocumentActivated -= OnDocumentActivated;
+            UnsubscribeDocumentEvents();
         }
 
         private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -469,8 +470,27 @@ namespace BS.CAD.Tools.Views
                 button.ClearValue(System.Windows.Controls.Button.BackgroundProperty);
         }
 
+        private void SubscribeDocumentEvents()
+        {
+            if (_documentEventsSubscribed) return;
+            AcadApp.DocumentManager.DocumentActivated += OnDocumentActivated;
+            _documentEventsSubscribed = true;
+        }
+
+        private void UnsubscribeDocumentEvents()
+        {
+            if (!_documentEventsSubscribed) return;
+            AcadApp.DocumentManager.DocumentActivated -= OnDocumentActivated;
+            _documentEventsSubscribed = false;
+        }
+
         private void OnDocumentActivated(object sender, DocumentCollectionEventArgs e)
         {
+            if (!IsVisible)
+            {
+                UnwatchDatabase();
+                return;
+            }
             _drawingStateLoaded = false;
             WatchDatabase();
             RefreshLayerList();
