@@ -75,6 +75,7 @@ namespace BS.CAD.Tools.Views
         private bool _toolbarDragInitialized;
         private bool _drawingStateLoaded;
         private bool _suppressSelectionChanged;
+        private bool _suppressDbSync;
         private const string LayerManagerStateKey = "BS_CAD_TOOLS_LAYER_MANAGER_STATE";
 
         public LayerManagerView()
@@ -150,18 +151,21 @@ namespace BS.CAD.Tools.Views
 
         private void OnDbObjectChanged(object sender, ObjectEventArgs e)
         {
+            if (_suppressDbSync) return;
             if (e.DBObject is LayerTableRecord)
                 ScheduleSync();
         }
 
         private void OnDbObjectErased(object sender, ObjectErasedEventArgs e)
         {
+            if (_suppressDbSync) return;
             if (e.DBObject is LayerTableRecord)
                 ScheduleSync();
         }
 
         private void OnSysVarChanged(object sender, Autodesk.AutoCAD.DatabaseServices.SystemVariableChangedEventArgs e)
         {
+            if (_suppressDbSync) return;
             if (e.Name == "CLAYER")
                 ScheduleSync();
         }
@@ -739,6 +743,10 @@ namespace BS.CAD.Tools.Views
                 var sel = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
                 if (!sel.Contains(item)) sel = new List<SimpleLayerItem> { item };
 
+                var selectedNames = sel
+                    .Select(x => x.Name)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
                 var doc = AcadApp.DocumentManager.MdiActiveDocument;
                 if (doc == null) return;
 
@@ -758,40 +766,49 @@ namespace BS.CAD.Tools.Views
                 int failCount = 0;
                 string lastError = "";
 
-                // Engine 托管的操作：独立事务处理，每个图层各自反转
-                if (tag == "On" || tag == "Lock" || tag == "Freeze" || tag == "Plot" || tag == "VPFreeze")
+                _suppressDbSync = true;
+                try
                 {
-                    foreach (var s in sel)
+                    // Engine 托管的操作：独立事务处理，每个图层各自反转
+                    if (tag == "On" || tag == "Lock" || tag == "Freeze" || tag == "Plot" || tag == "VPFreeze")
                     {
-                        LayerOperationResult? res = null;
-                        if (tag == "On") res = _engine.Layers.SetLayerOn(s.Name, !s.IsOn);
-                        else if (tag == "Lock") res = _engine.Layers.SetLayerLocked(s.Name, !s.IsLocked);
-                        else if (tag == "Freeze") res = _engine.Layers.SetLayerFrozen(s.Name, !s.IsFrozen);
-                        else if (tag == "Plot") res = _engine.Layers.SetLayerPlottable(s.Name, !s.IsPlottable);
-                        else if (tag == "VPFreeze") res = _engine.Layers.SetLayerViewportFrozen(s.Name, !s.IsVPFrozen);
+                        foreach (var s in sel)
+                        {
+                            LayerOperationResult? res = null;
+                            if (tag == "On") res = _engine.Layers.SetLayerOn(s.Name, !s.IsOn);
+                            else if (tag == "Lock") res = _engine.Layers.SetLayerLocked(s.Name, !s.IsLocked);
+                            else if (tag == "Freeze") res = _engine.Layers.SetLayerFrozen(s.Name, !s.IsFrozen);
+                            else if (tag == "Plot") res = _engine.Layers.SetLayerPlottable(s.Name, !s.IsPlottable);
+                            else if (tag == "VPFreeze") res = _engine.Layers.SetLayerViewportFrozen(s.Name, !s.IsVPFrozen);
 
-                        if (res != null && res.Success)
-                        {
-                            successCount++;
+                            if (res != null && res.Success)
+                            {
+                                successCount++;
+                            }
+                            else if (res != null)
+                            {
+                                failCount++;
+                                lastError = res.Message;
+                            }
                         }
-                        else if (res != null)
+
+                        if (failCount > 0)
                         {
-                            failCount++;
-                            lastError = res.Message;
+                            TxtStatus.Text = lastError;
+                            AcadApp.ShowAlertDialog(lastError);
                         }
                     }
-
-                    if (failCount > 0)
+                    if (successCount > 0)
                     {
-                        TxtStatus.Text = lastError;
-                        AcadApp.ShowAlertDialog(lastError);
+                        doc.Editor.Regen();
                     }
                 }
-                if (successCount > 0)
+                finally
                 {
-                    doc.Editor.Regen();
+                    _suppressDbSync = false;
                 }
                 RefreshLayerList();
+                RestoreSelectedLayers(selectedNames);
             } catch (System.Exception ex) { Logger.Error(ex); AcadApp.ShowAlertDialog(ex.Message); }
         }
 
@@ -1200,9 +1217,15 @@ namespace BS.CAD.Tools.Views
             }
             catch (System.Exception ex) { Logger.Error(ex); }
 
+            if (linetypes.Count == 0)
+            {
+                AcadApp.ShowAlertDialog("当前图纸没有可用线型。");
+                return;
+            }
+
             var sorted = linetypes.OrderBy(x => x).ToList();
             string? newLt = InputDialog.Select("修改线型", "选择线型：", sorted, i.Linetype);
-            if (string.IsNullOrWhiteSpace(newLt) || newLt == i.Linetype) return;
+            if (string.IsNullOrWhiteSpace(newLt)) return;
 
             var selectedNames = CaptureSelectedLayerNames();
             int successCount = 0;

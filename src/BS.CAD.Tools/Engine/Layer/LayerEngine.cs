@@ -747,6 +747,10 @@ namespace BS.CAD.Tools.Engine.Layer
                     {
                         if (!lt.Has(name))
                             return new LayerOperationResult { Success = false, Message = $"源图层 '{name}' 不存在。" };
+
+                        var sourceLtr = tr.GetObject(lt[name], OpenMode.ForRead) as LayerTableRecord;
+                        if (sourceLtr != null && sourceLtr.IsLocked)
+                            return new LayerOperationResult { Success = false, Message = $"源图层 '{name}' 已锁定，请先解锁后再合并。" };
                     }
 
                     ObjectId targetId = lt[targetLayerName];
