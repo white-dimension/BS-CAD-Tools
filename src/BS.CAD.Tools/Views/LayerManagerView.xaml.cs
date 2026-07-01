@@ -205,7 +205,7 @@ namespace BS.CAD.Tools.Views
                     Height = 44,
                     MinWidth = 116,
                     Margin = new System.Windows.Thickness(0, 0, 10, 10),
-                    Style = TryFindResource("Win11ButtonStyle") as Style,
+                    Style = TryFindResource("SettingsTileButtonStyle") as Style,
                     Tag = btn
                 };
                 UpdateSettingsButtonVisual(toggle, btn.Visibility == System.Windows.Visibility.Visible);
@@ -438,15 +438,16 @@ namespace BS.CAD.Tools.Views
 
         private static void UpdateSettingsButtonVisual(System.Windows.Controls.Button button, bool isOn)
         {
-            button.Background = new SolidColorBrush(isOn
-                ? System.Windows.Media.Color.FromRgb(10, 132, 214)
-                : System.Windows.Media.Color.FromRgb(36, 39, 41));
             button.BorderBrush = new SolidColorBrush(isOn
-                ? System.Windows.Media.Color.FromRgb(10, 132, 214)
+                ? System.Windows.Media.Color.FromRgb(53, 120, 246)
                 : System.Windows.Media.Color.FromRgb(52, 58, 63));
             button.Foreground = new SolidColorBrush(isOn
-                ? System.Windows.Media.Color.FromRgb(255, 255, 255)
+                ? System.Windows.Media.Color.FromRgb(231, 237, 242)
                 : System.Windows.Media.Color.FromRgb(143, 154, 163));
+            if (isOn)
+                button.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(26, 38, 55));
+            else
+                button.ClearValue(System.Windows.Controls.Button.BackgroundProperty);
         }
 
         private void OnDocumentActivated(object sender, DocumentCollectionEventArgs e)
@@ -1240,7 +1241,7 @@ namespace BS.CAD.Tools.Views
             string ltPrompt = sorted.Count == 1 && string.Equals(sorted[0], "Continuous", StringComparison.OrdinalIgnoreCase)
                 ? "选择线型（当前仅 Continuous，如需虚线/中心线请先在线型管理器中加载）："
                 : "选择线型：";
-            string? newLt = DarkComboDialog.Select("修改线型", ltPrompt, sorted, i.Linetype);
+            string? newLt = DarkComboBoxDialog.Select("修改线型", ltPrompt, sorted, i.Linetype);
             if (string.IsNullOrWhiteSpace(newLt)) return;
 
             var selectedNames = CaptureSelectedLayerNames();
@@ -1587,7 +1588,7 @@ namespace BS.CAD.Tools.Views
             if (sel.Count < 1) { AcadApp.ShowAlertDialog("请至少选中 1 个图层。"); return; }
             var targets = _cacheList.Select(x => x.Name).Where(n => !sel.Any(s => s.Name == n)).OrderBy(x => x).ToList();
             if (targets.Count == 0) { AcadApp.ShowAlertDialog("没有可用的目标图层。"); return; }
-            string? target = InputDialog.Select("合并图层", "选择目标图层：", targets, targets[0]);
+            string? target = DarkComboBoxDialog.Select("合并图层", "选择目标图层：", targets, targets[0]);
             if (string.IsNullOrWhiteSpace(target)) return;
             if (System.Windows.MessageBox.Show($"将把 {sel.Count} 个源图层中的对象迁移到：{target}\n\n本次不会删除源图层。\n建议先保存图纸。是否继续？", "CAD助手 - 合并图层确认", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
 
@@ -1698,7 +1699,7 @@ namespace BS.CAD.Tools.Views
                     foreach (ObjectId id in ltt!) { var rec = tr.GetObject(id, OpenMode.ForRead) as LinetypeTableRecord; if (rec != null) linetypes.Add(rec.Name); }
                     tr.Commit();
                 }
-                string? lt = DarkComboDialog.Select("批量改属性 - 线型", "选择线型：", linetypes.OrderBy(x => x).ToList(), sel[0].Linetype);
+                string? lt = DarkComboBoxDialog.Select("批量改属性 - 线型", "选择线型：", linetypes.OrderBy(x => x).ToList(), sel[0].Linetype);
                 if (string.IsNullOrWhiteSpace(lt)) return;
 
                 foreach (var layer in sel)
@@ -1727,7 +1728,7 @@ namespace BS.CAD.Tools.Views
             else if (mode == "线宽")
             {
                 var lwList = new List<string> { "默认", "ByLayer", "ByBlock", "0.00", "0.05", "0.09", "0.13", "0.15", "0.18", "0.20", "0.25", "0.30", "0.35", "0.40", "0.50", "0.53", "0.60", "0.70", "0.80", "0.90", "1.00", "1.06", "1.20", "1.40", "1.58", "2.00", "2.11" };
-                string? selLw = DarkComboDialog.Select("批量改属性 - 线宽", "选择线宽：", lwList, sel[0].LineWeightDisplay);
+                string? selLw = DarkComboBoxDialog.Select("批量改属性 - 线宽", "选择线宽：", lwList, sel[0].LineWeightDisplay);
                 if (string.IsNullOrWhiteSpace(selLw)) return;
 
                 LineWeight lw = selLw switch
@@ -1779,7 +1780,7 @@ namespace BS.CAD.Tools.Views
                 targets = new List<SimpleLayerItem> { i };
 
             var lwList = new List<string> { "默认", "ByLayer", "ByBlock", "0.00", "0.05", "0.09", "0.13", "0.15", "0.18", "0.20", "0.25", "0.30", "0.35", "0.40", "0.50", "0.53", "0.60", "0.70", "0.80", "0.90", "1.00", "1.06", "1.20", "1.40", "1.58", "2.00", "2.11" };
-            string? sel = DarkComboDialog.Select("修改线宽", "请在下方列表中选择：", lwList, i.LineWeightDisplay);
+            string? sel = DarkComboBoxDialog.Select("修改线宽", "请在下方列表中选择：", lwList, i.LineWeightDisplay);
             if (string.IsNullOrWhiteSpace(sel)) return;
             LineWeight lw = sel switch
             {
@@ -1913,7 +1914,7 @@ namespace BS.CAD.Tools.Views
                 .ToList();
             if (files.Count == 0) { AcadApp.ShowAlertDialog("没有已保存的模板。"); return; }
 
-            var (templateAction, selectedFile) = DarkComboDialog.Show(
+            var (templateAction, selectedFile) = DarkComboBoxDialog.Show(
                 "模板管理", "选择模板：", files, files[0], showDelete: true, okButtonText: "读取");
             if (templateAction == "cancel" || string.IsNullOrWhiteSpace(selectedFile)) return;
 
