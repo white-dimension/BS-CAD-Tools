@@ -1240,7 +1240,7 @@ namespace BS.CAD.Tools.Views
             string ltPrompt = sorted.Count == 1 && string.Equals(sorted[0], "Continuous", StringComparison.OrdinalIgnoreCase)
                 ? "选择线型（当前仅 Continuous，如需虚线/中心线请先在线型管理器中加载）："
                 : "选择线型：";
-            string? newLt = InputDialog.Select("修改线型", ltPrompt, sorted, i.Linetype);
+            string? newLt = DarkComboDialog.Select("修改线型", ltPrompt, sorted, i.Linetype);
             if (string.IsNullOrWhiteSpace(newLt)) return;
 
             var selectedNames = CaptureSelectedLayerNames();
@@ -1779,7 +1779,7 @@ namespace BS.CAD.Tools.Views
                 targets = new List<SimpleLayerItem> { i };
 
             var lwList = new List<string> { "默认", "ByLayer", "ByBlock", "0.00", "0.05", "0.09", "0.13", "0.15", "0.18", "0.20", "0.25", "0.30", "0.35", "0.40", "0.50", "0.53", "0.60", "0.70", "0.80", "0.90", "1.00", "1.06", "1.20", "1.40", "1.58", "2.00", "2.11" };
-            string? sel = InputDialog.Select("修改线宽", "请在下方列表中选择：", lwList, i.LineWeightDisplay);
+            string? sel = DarkComboDialog.Select("修改线宽", "请在下方列表中选择：", lwList, i.LineWeightDisplay);
             if (string.IsNullOrWhiteSpace(sel)) return;
             LineWeight lw = sel switch
             {
@@ -1912,9 +1912,32 @@ namespace BS.CAD.Tools.Views
                 .Cast<string>()
                 .ToList();
             if (files.Count == 0) { AcadApp.ShowAlertDialog("没有已保存的模板。"); return; }
-            string? name = InputDialog.Select("读取模板", "选择模板：", files, files[0]);
-            if (string.IsNullOrWhiteSpace(name)) return;
-            string path = System.IO.Path.Combine(dir, name);
+
+            var (templateAction, selectedFile) = DarkComboDialog.Show(
+                "模板管理", "选择模板：", files, files[0], showDelete: true);
+            if (templateAction == "cancel" || string.IsNullOrWhiteSpace(selectedFile)) return;
+
+            string path = System.IO.Path.Combine(dir, System.IO.Path.GetFileName(selectedFile));
+
+            if (templateAction == "delete")
+            {
+                string confirmMsg = $"确定删除模板 {selectedFile} 吗？此操作不可恢复。";
+                if (System.Windows.MessageBox.Show(confirmMsg, "CAD助手 - 删除模板",
+                    System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.Yes)
+                    return;
+
+                try
+                {
+                    System.IO.File.Delete(path);
+                    TxtStatus.Text = $"已删除模板：{selectedFile}";
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex);
+                    AcadApp.ShowAlertDialog($"删除模板失败: {ex.Message}");
+                }
+                return;
+            }
             var filters = new List<LayerFilterTemplate>();
             List<LayerTemplateItem> items = new();
 
