@@ -1860,6 +1860,22 @@ namespace BS.CAD.Tools.Views
             var template = new LayerTemplateFile
             {
                 Layers = _cacheList.Select(x => x.Name).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList(),
+                LayerItems = _cacheList
+                    .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                    .Select(x => new LayerTemplateItem
+                    {
+                        Name = x.Name,
+                        ColorIndex = x.ColorIndex,
+                        R = x.R,
+                        G = x.G,
+                        B = x.B,
+                        Linetype = x.Linetype,
+                        LineWeightDisplay = x.LineWeightDisplay,
+                        Transparency = x.Transparency,
+                        IsPlottable = x.IsPlottable,
+                        Description = x.Description
+                    })
+                    .ToList(),
                 Filters = _filterButtons.Values
                     .Where(x => !string.IsNullOrWhiteSpace(x.Label))
                     .Select(x => new LayerFilterTemplate
@@ -1888,19 +1904,32 @@ namespace BS.CAD.Tools.Views
             if (string.IsNullOrWhiteSpace(name)) return;
             string path = System.IO.Path.Combine(dir, name);
             var filters = new List<LayerFilterTemplate>();
-            IEnumerable<string> layerNames;
+            List<LayerTemplateItem> items = new();
+
             if (System.IO.Path.GetExtension(path).Equals(".json", StringComparison.OrdinalIgnoreCase))
             {
                 var template = JsonSerializer.Deserialize<LayerTemplateFile>(System.IO.File.ReadAllText(path)) ?? new LayerTemplateFile();
-                layerNames = template.Layers;
+                if (template.LayerItems != null && template.LayerItems.Count > 0)
+                    items = template.LayerItems;
+                else
+                    items = template.Layers
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Select(x => new LayerTemplateItem { Name = x })
+                        .ToList();
                 filters = template.Filters ?? new List<LayerFilterTemplate>();
             }
             else
             {
-                layerNames = System.IO.File.ReadAllLines(path);
+                var layerNames = System.IO.File.ReadAllLines(path);
+                items = layerNames
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => new LayerTemplateItem { Name = x })
+                    .ToList();
             }
 
-            var result = _engine.Layers.EnsureLayersExist(layerNames);
+            var layerNamesOnly = items.Select(x => x.Name).ToList();
+            var existingNames = new HashSet<string>(_cacheList.Select(x => x.Name), StringComparer.OrdinalIgnoreCase);
+            var result = _engine.Layers.EnsureLayersExist(layerNamesOnly);
             if (!result.Success)
             {
                 TxtStatus.Text = result.Message;
@@ -1908,12 +1937,60 @@ namespace BS.CAD.Tools.Views
                 return;
             }
 
+            int propertyUpdatedCount = 0;
+            int skippedLinetypeCount = 0;
+
+            foreach (var item in items)
+            {
+                var acColor = Autodesk.AutoCAD.Colors.Color.FromColorIndex(
+                    Autodesk.AutoCAD.Colors.ColorMethod.ByAci, item.ColorIndex);
+                _engine.Layers.SetLayerColor(item.Name, acColor);
+
+                if (!string.IsNullOrWhiteSpace(item.Linetype) &&
+                    !string.Equals(item.Linetype, "ByLayer", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(item.Linetype, "ByBlock", StringComparison.OrdinalIgnoreCase))
+                {
+                    var ltResult = _engine.Layers.SetLayerLinetype(item.Name, item.Linetype);
+                    if (!ltResult.Success)
+                        skippedLinetypeCount++;
+                }
+
+                LineWeight lw = item.LineWeightDisplay switch
+                {
+                    "ByLayer" => LineWeight.ByLayer,
+                    "ByBlock" => LineWeight.ByBlock,
+                    "默认" => LineWeight.ByLineWeightDefault,
+                    "0.00" => LineWeight.LineWeight000, "0.05" => LineWeight.LineWeight005, "0.09" => LineWeight.LineWeight009,
+                    "0.13" => LineWeight.LineWeight013, "0.15" => LineWeight.LineWeight015, "0.18" => LineWeight.LineWeight018,
+                    "0.20" => LineWeight.LineWeight020, "0.25" => LineWeight.LineWeight025, "0.30" => LineWeight.LineWeight030,
+                    "0.35" => LineWeight.LineWeight035, "0.40" => LineWeight.LineWeight040, "0.50" => LineWeight.LineWeight050,
+                    "0.53" => LineWeight.LineWeight053, "0.60" => LineWeight.LineWeight060, "0.70" => LineWeight.LineWeight070,
+                    "0.80" => LineWeight.LineWeight080, "0.90" => LineWeight.LineWeight090, "1.00" => LineWeight.LineWeight100,
+                    "1.06" => LineWeight.LineWeight106, "1.20" => LineWeight.LineWeight120, "1.40" => LineWeight.LineWeight140,
+                    "1.58" => LineWeight.LineWeight158, "2.00" => LineWeight.LineWeight200, "2.11" => LineWeight.LineWeight211,
+                    _ => LineWeight.ByLineWeightDefault
+                };
+                _engine.Layers.SetLayerLineWeight(item.Name, lw);
+
+                _engine.Layers.SetLayerTransparency(item.Name, (byte)item.Transparency);
+                _engine.Layers.SetLayerPlottable(item.Name, item.IsPlottable);
+                _engine.Layers.SetLayerDescription(item.Name, item.Description);
+                propertyUpdatedCount++;
+            }
+
             ClearCustomFilters();
             foreach (var filter in filters)
                 CreateFilterLabel(filter.Label, filter.LayerNames);
             SetActiveFilterButton(BtnFilterAll);
             RefreshLayerList();
-            TxtStatus.Text = result.Message;
+
+            int createdCount = layerNamesOnly.Count(n => !existingNames.Contains(n));
+            int updatedCount = layerNamesOnly.Count(n => existingNames.Contains(n));
+            string msg = $"已读取模板：创建 {createdCount} 个图层，更新 {updatedCount} 个图层";
+            if (skippedLinetypeCount > 0)
+                msg += $"，跳过 {skippedLinetypeCount} 个线型（未加载）";
+            msg += "。";
+            TxtStatus.Text = msg;
         }
 
         // ── Export ──
