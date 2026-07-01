@@ -25,20 +25,27 @@ using BS.CAD.Tools.Engine.Layer;
 
 namespace BS.CAD.Tools.Views
 {
-    public class SimpleLayerItem : INotifyPropertyChanged
+    public class SimpleLayerItem : INotifyPropertyChanged, Engine.Layer.ILayerFilterItem
     {
         public string Name { get; set; } = "";
+        string Engine.Layer.ILayerFilterItem.LayerName => Name;
         public bool IsOn { get; set; }
+        bool Engine.Layer.ILayerFilterItem.IsLayerOn => IsOn;
         public double IsOnOpacity => IsOn ? 1.0 : 0.35;
         public bool IsFrozen { get; set; }
+        bool Engine.Layer.ILayerFilterItem.IsLayerFrozen => IsFrozen;
         public double IsFrozenOpacity => IsFrozen ? 1.0 : 0.35;
         public bool IsLocked { get; set; }
+        bool Engine.Layer.ILayerFilterItem.IsLayerLocked => IsLocked;
         public double IsLockedOpacity => IsLocked ? 1.0 : 0.35;
         public bool IsPlottable { get; set; }
         public double IsPlottableOpacity => IsPlottable ? 1.0 : 0.35;
         public bool IsVPFrozen { get; set; }
         public double IsVPFrozenOpacity => IsVPFrozen ? 1.0 : 0.35;
         public string Linetype { get; set; } = "Continuous";
+        bool Engine.Layer.ILayerFilterItem.IsLayerCurrent => IsCurrent;
+        short Engine.Layer.ILayerFilterItem.LayerColorIndex => ColorIndex;
+        string Engine.Layer.ILayerFilterItem.LayerLinetype => Linetype;
         public string Description { get; set; } = "";
         public bool IsCurrent { get; set; }
         public System.Windows.Visibility IsCurrentVisibility => IsCurrent ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
@@ -69,13 +76,13 @@ namespace BS.CAD.Tools.Views
         private string _quickFilter = "All";
 
         private Database? _watchedDb;
-        private DateTime _lastSync = DateTime.MinValue;
-        private bool _syncPending;
         private System.Windows.Point _toolbarDragStart;
         private bool _toolbarDragInitialized;
         private bool _drawingStateLoaded;
         private bool _suppressSelectionChanged;
         private bool _suppressDbSync;
+        private HashSet<string>? _activeGroupLayerNames;
+        private System.Windows.Threading.DispatcherTimer? _syncTimer;
         private const string LayerManagerStateKey = "BS_CAD_TOOLS_LAYER_MANAGER_STATE";
 
         public LayerManagerView()
@@ -101,6 +108,15 @@ namespace BS.CAD.Tools.Views
             InitToolbarDrag();
             InitSettingsPanel();
             LoadLocalUiState();
+            _syncTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(400)
+            };
+            _syncTimer.Tick += (_, _) =>
+            {
+                _syncTimer?.Stop();
+                RefreshLayerList();
+            };
             Dispatcher.BeginInvoke(new Action(RefreshLayerList));
             WatchDatabase();
             AcadApp.DocumentManager.DocumentActivated += OnDocumentActivated;
@@ -108,6 +124,8 @@ namespace BS.CAD.Tools.Views
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
+            _syncTimer?.Stop();
+            _syncTimer = null;
             UnwatchDatabase();
             AcadApp.DocumentManager.DocumentActivated -= OnDocumentActivated;
         }
@@ -172,22 +190,8 @@ namespace BS.CAD.Tools.Views
 
         private void ScheduleSync()
         {
-            if (_syncPending) return;
-            var elapsed = (DateTime.Now - _lastSync).TotalMilliseconds;
-            if (elapsed < 500)
-            {
-                _syncPending = true;
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    _syncPending = false;
-                    RefreshLayerList();
-                }), System.Windows.Threading.DispatcherPriority.Background);
-            }
-            else
-            {
-                _lastSync = DateTime.Now;
-                Dispatcher.BeginInvoke(new Action(RefreshLayerList), System.Windows.Threading.DispatcherPriority.Background);
-            }
+            _syncTimer?.Stop();
+            _syncTimer?.Start();
         }
 
         private void InitSettingsPanel()
@@ -611,32 +615,17 @@ namespace BS.CAD.Tools.Views
         {
             TraceLog.Step("UpdateDisplay:ENTER");
             try {
-                string s = TxtSearch.Text.ToLower();
-                IEnumerable<SimpleLayerItem> query = _cacheList;
+                var filtered = Engine.Layer.LayerDisplayFilter.Apply(
+                    _cacheList,
+                    _activeGroupLayerNames,
+                    _activeFilter?.LayerNames,
+                    _quickFilter,
+                    TxtSearch.Text);
 
-                if (_activeFilter?.LayerNames is { Count: > 0 } names)
-                    query = query.Where(x => names.Contains(x.Name));
-
-                query = _quickFilter switch
-                {
-                    "On" => query.Where(x => x.IsOn),
-                    "Off" => query.Where(x => !x.IsOn),
-                    "Frozen" => query.Where(x => x.IsFrozen),
-                    "Locked" => query.Where(x => x.IsLocked),
-                    "Current" => query.Where(x => x.IsCurrent),
-                    _ => query
-                };
-
-                var f = query.Where(x =>
-                    string.IsNullOrEmpty(s)
-                    || x.Name.ToLower().Contains(s)
-                    || x.ColorIndex.ToString().Contains(s)
-                    || x.Linetype.ToLower().Contains(s)
-                ).ToList();
-                TraceLog.Step($"UpdateDisplay:filtered {f.Count} items, before ItemsSource");
-                GridLayers.ItemsSource = f;
+                TraceLog.Step($"UpdateDisplay:filtered {filtered.Count} items, before ItemsSource");
+                GridLayers.ItemsSource = filtered;
                 TraceLog.Step("UpdateDisplay:ItemsSource set");
-                UpdateStatus(f.Count);
+                UpdateStatus(filtered.Count);
             } catch (Exception ex) { TraceLog.Step($"UpdateDisplay:CATCH {ex.GetType().Name}: {ex.Message}"); Logger.Error(ex); }
         }
 
