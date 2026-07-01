@@ -528,7 +528,11 @@ namespace BS.CAD.Tools.Engine.Layer
                         return new LayerOperationResult { Success = false, Message = "无法打开图层记录。" };
                     }
 
-                    ltr.Transparency = new Autodesk.AutoCAD.Colors.Transparency(transparency);
+                    byte alpha = (byte)Math.Clamp(
+                        (int)Math.Round(255.0 * (90 - transparency) / 90.0),
+                        0,
+                        255);
+                    ltr.Transparency = new Autodesk.AutoCAD.Colors.Transparency(alpha);
                     tr.Commit();
                 }
                 return new LayerOperationResult { Success = true, Message = "图层透明度已修改。" };

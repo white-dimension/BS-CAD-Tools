@@ -1087,29 +1087,84 @@ namespace BS.CAD.Tools.Views
                 }
             }
         }
+
+        private HashSet<string> CaptureSelectedLayerNames()
+        {
+            return GridLayers.SelectedItems
+                .OfType<SimpleLayerItem>()
+                .Select(x => x.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private void RestoreSelectedLayers(HashSet<string> selectedNames)
+        {
+            if (selectedNames == null || selectedNames.Count == 0) return;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _suppressSelectionChanged = true;
+                try
+                {
+                    GridLayers.SelectedItems.Clear();
+                    foreach (var item in GridLayers.Items.OfType<SimpleLayerItem>())
+                    {
+                        if (selectedNames.Contains(item.Name))
+                            GridLayers.SelectedItems.Add(item);
+                    }
+                }
+                finally
+                {
+                    _suppressSelectionChanged = false;
+                    UpdateStatus();
+                }
+            }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+        }
+
         private void OnTransparencyClick(object s, RoutedEventArgs e)
         {
             var i = (s as System.Windows.Controls.Button)?.DataContext as SimpleLayerItem;
             if (i == null) return;
 
+            var targets = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+            if (!targets.Any(x => string.Equals(x.Name, i.Name, StringComparison.OrdinalIgnoreCase)))
+                targets = new List<SimpleLayerItem> { i };
+
             string? input = InputDialog.Show("修改透明度", "请输入透明度 (0=不透明, 90=最透明)：", i.TransparencyDisplay, preferChineseIme: false);
             if (string.IsNullOrWhiteSpace(input)) return;
 
-            if (byte.TryParse(input, out byte alpha) && alpha <= 90)
+            if (!byte.TryParse(input, out byte alpha) || alpha > 90)
             {
-                var op = _engine.Layers.SetLayerTransparency(i.Name, alpha);
-                if (!op.Success)
-                {
-                    TxtStatus.Text = op.Message;
-                    AcadApp.ShowAlertDialog(op.Message);
-                    return;
-                }
+                AcadApp.ShowAlertDialog("请输入 0-90 之间的数值。");
+                return;
+            }
 
-                RefreshLayerList();
+            var selectedNames = CaptureSelectedLayerNames();
+            int successCount = 0;
+            int failCount = 0;
+            string lastError = "";
+
+            foreach (var layer in targets)
+            {
+                var op = _engine.Layers.SetLayerTransparency(layer.Name, alpha);
+                if (op.Success) successCount++;
+                else { failCount++; lastError = op.Message; }
+            }
+
+            RefreshLayerList();
+            RestoreSelectedLayers(selectedNames);
+
+            if (failCount > 0)
+            {
+                TxtStatus.Text = $"批量修改完成，成功 {successCount} 个，失败 {failCount} 个。";
+                AcadApp.ShowAlertDialog($"批量修改失败 {failCount} 个。\n最后一条错误: {lastError}");
+            }
+            else if (successCount > 1)
+            {
+                TxtStatus.Text = $"已批量修改 {successCount} 个图层。";
             }
             else
             {
-                AcadApp.ShowAlertDialog("请输入 0-90 之间的数值。");
+                TxtStatus.Text = "图层透明度已修改。";
             }
         }
 
@@ -1117,6 +1172,10 @@ namespace BS.CAD.Tools.Views
         {
             var i = (s as System.Windows.Controls.Button)?.DataContext as SimpleLayerItem;
             if (i == null) return;
+
+            var targets = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+            if (!targets.Any(x => string.Equals(x.Name, i.Name, StringComparison.OrdinalIgnoreCase)))
+                targets = new List<SimpleLayerItem> { i };
 
             var linetypes = new System.Collections.Generic.List<string>();
             var doc = AcadApp.DocumentManager.MdiActiveDocument;
@@ -1144,21 +1203,44 @@ namespace BS.CAD.Tools.Views
             string? newLt = InputDialog.Select("修改线型", "选择线型：", sorted, i.Linetype);
             if (string.IsNullOrWhiteSpace(newLt) || newLt == i.Linetype) return;
 
-            var op = _engine.Layers.SetLayerLinetype(i.Name, newLt);
-            if (!op.Success)
+            var selectedNames = CaptureSelectedLayerNames();
+            int successCount = 0;
+            int failCount = 0;
+            string lastError = "";
+
+            foreach (var layer in targets)
             {
-                TxtStatus.Text = op.Message;
-                AcadApp.ShowAlertDialog(op.Message);
-                return;
+                var op = _engine.Layers.SetLayerLinetype(layer.Name, newLt);
+                if (op.Success) successCount++;
+                else { failCount++; lastError = op.Message; }
             }
 
             RefreshLayerList();
+            RestoreSelectedLayers(selectedNames);
+
+            if (failCount > 0)
+            {
+                TxtStatus.Text = $"批量修改完成，成功 {successCount} 个，失败 {failCount} 个。";
+                AcadApp.ShowAlertDialog($"批量修改失败 {failCount} 个。\n最后一条错误: {lastError}");
+            }
+            else if (successCount > 1)
+            {
+                TxtStatus.Text = $"已批量修改 {successCount} 个图层。";
+            }
+            else
+            {
+                TxtStatus.Text = "图层线型已修改。";
+            }
         }
         private void OnGridDoubleClick(object s, MouseButtonEventArgs e) => OnSetCurrent(s, e);
         private void OnColorClick(object s, RoutedEventArgs e)
         {
             var i = (s as System.Windows.Controls.Button)?.DataContext as SimpleLayerItem;
             if (i == null) return;
+
+            var targets = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+            if (!targets.Any(x => string.Equals(x.Name, i.Name, StringComparison.OrdinalIgnoreCase)))
+                targets = new List<SimpleLayerItem> { i };
 
             AcColor current;
             try
@@ -1173,15 +1255,34 @@ namespace BS.CAD.Tools.Views
             var result = ColorPickerDialog.Show(current);
             if (result != null)
             {
-                var op = _engine.Layers.SetLayerColor(i.Name, result);
-                if (!op.Success)
+                var selectedNames = CaptureSelectedLayerNames();
+                int successCount = 0;
+                int failCount = 0;
+                string lastError = "";
+
+                foreach (var layer in targets)
                 {
-                    TxtStatus.Text = op.Message;
-                    AcadApp.ShowAlertDialog(op.Message);
-                    return;
+                    var op = _engine.Layers.SetLayerColor(layer.Name, result);
+                    if (op.Success) successCount++;
+                    else { failCount++; lastError = op.Message; }
                 }
 
                 RefreshLayerList();
+                RestoreSelectedLayers(selectedNames);
+
+                if (failCount > 0)
+                {
+                    TxtStatus.Text = $"批量修改完成，成功 {successCount} 个，失败 {failCount} 个。";
+                    AcadApp.ShowAlertDialog($"批量修改失败 {failCount} 个。\n最后一条错误: {lastError}");
+                }
+                else if (successCount > 1)
+                {
+                    TxtStatus.Text = $"已批量修改 {successCount} 个图层。";
+                }
+                else
+                {
+                    TxtStatus.Text = "图层颜色已修改。";
+                }
             }
         }
         private void OnRefreshManual(object s, RoutedEventArgs e)
@@ -1667,6 +1768,11 @@ namespace BS.CAD.Tools.Views
         {
             var i = (s as System.Windows.Controls.Button)?.DataContext as SimpleLayerItem;
             if (i == null) return;
+
+            var targets = GridLayers.SelectedItems.OfType<SimpleLayerItem>().ToList();
+            if (!targets.Any(x => string.Equals(x.Name, i.Name, StringComparison.OrdinalIgnoreCase)))
+                targets = new List<SimpleLayerItem> { i };
+
             var lwList = new List<string> { "默认", "ByLayer", "ByBlock", "0.00", "0.05", "0.09", "0.13", "0.15", "0.18", "0.20", "0.25", "0.30", "0.35", "0.40", "0.50", "0.53", "0.60", "0.70", "0.80", "0.90", "1.00", "1.06", "1.20", "1.40", "1.58", "2.00", "2.11" };
             string? sel = InputDialog.Select("修改线宽", "请在下方列表中选择：", lwList, i.LineWeightDisplay);
             if (string.IsNullOrWhiteSpace(sel)) return;
@@ -1685,15 +1791,35 @@ namespace BS.CAD.Tools.Views
                 "1.58" => LineWeight.LineWeight158, "2.00" => LineWeight.LineWeight200, "2.11" => LineWeight.LineWeight211,
                 _ => LineWeight.ByLineWeightDefault
             };
-            var op = _engine.Layers.SetLayerLineWeight(i.Name, lw);
-            if (!op.Success)
+
+            var selectedNames = CaptureSelectedLayerNames();
+            int successCount = 0;
+            int failCount = 0;
+            string lastError = "";
+
+            foreach (var layer in targets)
             {
-                TxtStatus.Text = op.Message;
-                AcadApp.ShowAlertDialog(op.Message);
-                return;
+                var op = _engine.Layers.SetLayerLineWeight(layer.Name, lw);
+                if (op.Success) successCount++;
+                else { failCount++; lastError = op.Message; }
             }
 
             RefreshLayerList();
+            RestoreSelectedLayers(selectedNames);
+
+            if (failCount > 0)
+            {
+                TxtStatus.Text = $"批量修改完成，成功 {successCount} 个，失败 {failCount} 个。";
+                AcadApp.ShowAlertDialog($"批量修改失败 {failCount} 个。\n最后一条错误: {lastError}");
+            }
+            else if (successCount > 1)
+            {
+                TxtStatus.Text = $"已批量修改 {successCount} 个图层。";
+            }
+            else
+            {
+                TxtStatus.Text = "图层线宽已修改。";
+            }
         }
 
         // ── Walk ──
