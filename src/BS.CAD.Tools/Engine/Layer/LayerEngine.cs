@@ -299,6 +299,80 @@ namespace BS.CAD.Tools.Engine.Layer
             }
         }
 
+        public LayerOperationResult SetLayerPlottable(string layerName, bool isPlottable)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    var ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null)
+                    {
+                        ltr.IsPlottable = isPlottable;
+                    }
+
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = isPlottable ? "图层已设为打印。" : "图层已设为不打印。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"操作失败: {ex.Message}" };
+            }
+        }
+
+        public LayerOperationResult SetLayerViewportFrozen(string layerName, bool isViewportFrozen)
+        {
+            if (string.IsNullOrWhiteSpace(layerName))
+                return new LayerOperationResult { Success = false, Message = "图层名不能为空。" };
+
+            Document? doc = AcadApp.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new LayerOperationResult { Success = false, Message = "无活动文档。" };
+
+            try
+            {
+                using (doc.LockDocument())
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (lt == null || !lt.Has(layerName))
+                    {
+                        return new LayerOperationResult { Success = false, Message = "图层不存在。" };
+                    }
+
+                    var ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite) as LayerTableRecord;
+                    if (ltr != null)
+                    {
+                        ltr.ViewportVisibilityDefault = isViewportFrozen;
+                    }
+
+                    tr.Commit();
+                }
+                return new LayerOperationResult { Success = true, Message = isViewportFrozen ? "图层已设为新视口冻结。" : "图层已设为新视口解冻。" };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new LayerOperationResult { Success = false, Message = $"操作失败: {ex.Message}" };
+            }
+        }
+
         private static string ResolveLinetypeName(Transaction tr, LayerTableRecord layer)
         {
             if (layer.LinetypeObjectId.IsNull)
@@ -398,5 +472,3 @@ namespace BS.CAD.Tools.Engine.Layer
         }
     }
 }
-
-

@@ -752,10 +752,9 @@ namespace BS.CAD.Tools.Views
                 int successCount = 0;
                 int failCount = 0;
                 string lastError = "";
-                bool shouldRegen = false;
 
                 // Engine 托管的操作：独立事务处理，每个图层各自反转
-                if (tag == "On" || tag == "Lock" || tag == "Freeze")
+                if (tag == "On" || tag == "Lock" || tag == "Freeze" || tag == "Plot" || tag == "VPFreeze")
                 {
                     foreach (var s in sel)
                     {
@@ -763,6 +762,8 @@ namespace BS.CAD.Tools.Views
                         if (tag == "On") res = _engine.Layers.SetLayerOn(s.Name, !s.IsOn);
                         else if (tag == "Lock") res = _engine.Layers.SetLayerLocked(s.Name, !s.IsLocked);
                         else if (tag == "Freeze") res = _engine.Layers.SetLayerFrozen(s.Name, !s.IsFrozen);
+                        else if (tag == "Plot") res = _engine.Layers.SetLayerPlottable(s.Name, !s.IsPlottable);
+                        else if (tag == "VPFreeze") res = _engine.Layers.SetLayerViewportFrozen(s.Name, !s.IsVPFrozen);
 
                         if (res != null && res.Success)
                         {
@@ -780,42 +781,12 @@ namespace BS.CAD.Tools.Views
                         TxtStatus.Text = lastError;
                         AcadApp.ShowAlertDialog(lastError);
                     }
-
-                    if (successCount > 0)
-                    {
-                        shouldRegen = true;
-                    }
                 }
-                else
-                {
-                    // 尚未抽离的操作：继续使用旧的 UI 事务，保持统一 targetState
-                    using (doc.LockDocument())
-                    using (var tr = doc.Database.TransactionManager.StartTransaction())
-                    {
-                        LayerTable? lt = tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead) as LayerTable;
-                        if (lt == null) return;
-
-                        foreach (var s in sel)
-                        {
-                            if (lt.Has(s.Name))
-                            {
-                                var ltr = tr.GetObject(lt[s.Name], OpenMode.ForWrite) as LayerTableRecord;
-                                if (ltr == null) continue;
-
-                                if (tag == "Plot") ltr.IsPlottable = targetState.Value;
-                                else if (tag == "VPFreeze") ltr.ViewportVisibilityDefault = targetState.Value;
-                            }
-                        }
-                        tr.Commit();
-                        shouldRegen = true;
-                    }
-                }
-
-                RefreshLayerList();
-                if (shouldRegen)
+                if (successCount > 0)
                 {
                     doc.Editor.Regen();
                 }
+                RefreshLayerList();
             } catch (System.Exception ex) { Logger.Error(ex); AcadApp.ShowAlertDialog(ex.Message); }
         }
 
