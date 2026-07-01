@@ -1698,7 +1698,7 @@ namespace BS.CAD.Tools.Views
                     foreach (ObjectId id in ltt!) { var rec = tr.GetObject(id, OpenMode.ForRead) as LinetypeTableRecord; if (rec != null) linetypes.Add(rec.Name); }
                     tr.Commit();
                 }
-                string? lt = InputDialog.Select("批量改属性 - 线型", "选择线型：", linetypes.OrderBy(x => x).ToList(), sel[0].Linetype);
+                string? lt = DarkComboDialog.Select("批量改属性 - 线型", "选择线型：", linetypes.OrderBy(x => x).ToList(), sel[0].Linetype);
                 if (string.IsNullOrWhiteSpace(lt)) return;
 
                 foreach (var layer in sel)
@@ -1727,7 +1727,7 @@ namespace BS.CAD.Tools.Views
             else if (mode == "线宽")
             {
                 var lwList = new List<string> { "默认", "ByLayer", "ByBlock", "0.00", "0.05", "0.09", "0.13", "0.15", "0.18", "0.20", "0.25", "0.30", "0.35", "0.40", "0.50", "0.53", "0.60", "0.70", "0.80", "0.90", "1.00", "1.06", "1.20", "1.40", "1.58", "2.00", "2.11" };
-                string? selLw = InputDialog.Select("批量改属性 - 线宽", "选择线宽：", lwList, sel[0].LineWeightDisplay);
+                string? selLw = DarkComboDialog.Select("批量改属性 - 线宽", "选择线宽：", lwList, sel[0].LineWeightDisplay);
                 if (string.IsNullOrWhiteSpace(selLw)) return;
 
                 LineWeight lw = selLw switch
@@ -1914,7 +1914,7 @@ namespace BS.CAD.Tools.Views
             if (files.Count == 0) { AcadApp.ShowAlertDialog("没有已保存的模板。"); return; }
 
             var (templateAction, selectedFile) = DarkComboDialog.Show(
-                "模板管理", "选择模板：", files, files[0], showDelete: true);
+                "模板管理", "选择模板：", files, files[0], showDelete: true, okButtonText: "读取");
             if (templateAction == "cancel" || string.IsNullOrWhiteSpace(selectedFile)) return;
 
             string path = System.IO.Path.Combine(dir, System.IO.Path.GetFileName(selectedFile));

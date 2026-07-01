@@ -53,7 +53,8 @@ namespace BS.CAD.Tools.Views
         /// </returns>
         public static (string Action, string? SelectedItem) Show(
             string title, string prompt, List<string> items,
-            string defaultItem = "", bool showDelete = false)
+            string defaultItem = "", bool showDelete = false,
+            string okButtonText = "确定")
         {
             var dlg = new System.Windows.Window
             {
@@ -262,7 +263,7 @@ namespace BS.CAD.Tools.Views
 
             var okBtn = new System.Windows.Controls.Button
             {
-                Content = "读取",
+                Content = okButtonText,
                 Width = 80, Height = 34,
                 Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(53, 120, 246)),
                 BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(90, 145, 255)),
