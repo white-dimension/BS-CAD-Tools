@@ -2,6 +2,7 @@ using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.Runtime;
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
 using BS.CAD.Tools.Utils;
@@ -13,6 +14,7 @@ namespace BS.CAD.Tools
         public static IntPtr TargetChineseHKL = IntPtr.Zero;
         public static IntPtr TargetEnglishHKL = IntPtr.Zero;
         private static bool _lastNeedsChineseInput = false;
+        private static string _lastFocusedPanelMode = string.Empty;
 
         public static string SelectedShx = "txt.shx";
         public static string SelectedBigFont = "gbcbig.shx";
@@ -23,8 +25,19 @@ namespace BS.CAD.Tools
         private static extern IntPtr GetKeyboardLayout(uint idThread);
         [DllImport("user32.dll")]
         private static extern int GetKeyboardLayoutList(int nBuff, [Out] IntPtr[] lpList);
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool GetGUIThreadInfo(uint idThread, ref GuiThreadInfo info);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder className, int maxCount);
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
 
         private const uint WM_INPUTLANGCHANGEREQUEST = 0x0050;
+        private const uint GaParent = 1;
 
         public void Initialize()
         {
@@ -102,6 +115,8 @@ namespace BS.CAD.Tools
 
                     _lastNeedsChineseInput = false;
                 }
+
+                UpdateFocusedPanelInputMode(cmdNames);
             }
             catch (System.Exception ex) { Logger.Error(ex); }
         }
@@ -226,10 +241,146 @@ namespace BS.CAD.Tools
                    || cmd.Contains("PROPERTIES");
         }
 
+        private static void UpdateFocusedPanelInputMode(string activeCommand)
+        {
+            if (!string.IsNullOrEmpty(activeCommand)) return;
+
+            string mode = GetFocusedPanelInputMode();
+            if (string.Equals(mode, _lastFocusedPanelMode, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(mode))
+            {
+                if (!CadImeBridge.Notify("PanelInputStarted", "zh", mode))
+                {
+                    SwitchToIME(TargetChineseHKL);
+                }
+            }
+            else if (!string.IsNullOrEmpty(_lastFocusedPanelMode))
+            {
+                if (!CadImeBridge.Notify("PanelInputEnded", "en", "CAD 命令模式"))
+                {
+                    SwitchToIME(TargetEnglishHKL);
+                }
+            }
+
+            _lastFocusedPanelMode = mode;
+        }
+
+        private static string GetFocusedPanelInputMode()
+        {
+            try
+            {
+                IntPtr mainWindow = AcadApp.MainWindow.Handle;
+                if (mainWindow == IntPtr.Zero) return string.Empty;
+
+                uint threadId = GetWindowThreadProcessId(mainWindow, out _);
+                if (threadId == 0) return string.Empty;
+
+                var info = new GuiThreadInfo
+                {
+                    cbSize = Marshal.SizeOf<GuiThreadInfo>()
+                };
+
+                if (!GetGUIThreadInfo(threadId, ref info) || info.hwndFocus == IntPtr.Zero)
+                {
+                    return string.Empty;
+                }
+
+                string focusPath = BuildWindowPath(info.hwndFocus);
+                if (string.IsNullOrEmpty(focusPath)) return string.Empty;
+
+                if (ContainsAny(focusPath, "图层特性管理器", "Layer Properties Manager", "CLASSICLAYER", "AcLayer"))
+                {
+                    return "CAD 图层名称/说明";
+                }
+
+                if (ContainsAny(focusPath, "特性", "Properties", "Property", "属性", "AcProperty", "OPM"))
+                {
+                    return "CAD 特性面板编辑";
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Logger.Warn($"Focused panel IME detection failed: {ex.Message}");
+            }
+
+            return string.Empty;
+        }
+
+        private static string BuildWindowPath(IntPtr hwnd)
+        {
+            var parts = new StringBuilder();
+            IntPtr current = hwnd;
+
+            for (int i = 0; i < 12 && current != IntPtr.Zero; i++)
+            {
+                AppendWindowPart(parts, current);
+                current = GetAncestor(current, GaParent);
+            }
+
+            return parts.ToString();
+        }
+
+        private static void AppendWindowPart(StringBuilder parts, IntPtr hwnd)
+        {
+            var title = new StringBuilder(256);
+            var className = new StringBuilder(256);
+
+            _ = GetWindowText(hwnd, title, title.Capacity);
+            _ = GetClassName(hwnd, className, className.Capacity);
+
+            if (title.Length > 0 || className.Length > 0)
+            {
+                parts.Append(title);
+                parts.Append(' ');
+                parts.Append(className);
+                parts.Append(' ');
+            }
+        }
+
+        private static bool ContainsAny(string text, params string[] keywords)
+        {
+            foreach (string keyword in keywords)
+            {
+                if (text.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static void SwitchToIME(IntPtr hKL)
         {
             if (hKL == IntPtr.Zero) return;
             try { PostMessage(AcadApp.MainWindow.Handle, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, hKL); } catch (System.Exception ex) { Logger.Error(ex); }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct GuiThreadInfo
+        {
+            public int cbSize;
+            public int flags;
+            public IntPtr hwndActive;
+            public IntPtr hwndFocus;
+            public IntPtr hwndCapture;
+            public IntPtr hwndMenuOwner;
+            public IntPtr hwndMoveSize;
+            public IntPtr hwndCaret;
+            public Rect rcCaret;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Rect
+        {
+            public int left;
+            public int top;
+            public int right;
+            public int bottom;
         }
     }
 }
