@@ -243,7 +243,10 @@ namespace BS.CAD.Tools
 
         private static void UpdateFocusedPanelInputMode(string activeCommand)
         {
-            if (!string.IsNullOrEmpty(activeCommand)) return;
+            if (!string.IsNullOrEmpty(activeCommand) && !IsLayerPanelCommand(activeCommand))
+            {
+                return;
+            }
 
             string mode = GetFocusedPanelInputMode();
             if (string.Equals(mode, _lastFocusedPanelMode, StringComparison.Ordinal))
@@ -292,7 +295,7 @@ namespace BS.CAD.Tools
                 string focusPath = BuildWindowPath(info.hwndFocus);
                 if (string.IsNullOrEmpty(focusPath)) return string.Empty;
 
-                if (ContainsAny(focusPath, "图层特性管理器", "Layer Properties Manager", "CLASSICLAYER", "AcLayer"))
+                if (ContainsAny(focusPath, "图层特性管理器", "图层", "Layer Properties Manager", "Layer", "CLASSICLAYER", "AcLayer", "AcLy"))
                 {
                     return "CAD 图层名称/说明";
                 }
@@ -308,6 +311,15 @@ namespace BS.CAD.Tools
             }
 
             return string.Empty;
+        }
+
+        private static bool IsLayerPanelCommand(string cmd)
+        {
+            return cmd == "LAYER"
+                   || cmd == "LA"
+                   || cmd == "LY"
+                   || cmd == "CLASSICLAYER"
+                   || cmd.Contains("LAYER");
         }
 
         private static string BuildWindowPath(IntPtr hwnd)
