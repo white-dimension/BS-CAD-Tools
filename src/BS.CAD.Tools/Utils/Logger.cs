@@ -11,6 +11,8 @@ namespace BS.CAD.Tools.Utils
             "BS-CAD-Tools");
         private static readonly string LogPath = Path.Combine(LogDir, "debug.log");
         private static readonly object _lock = new();
+        private const long MaxLogBytes = 1024 * 1024 * 3;
+        private const string BackupLogFileName = "debug.old.log";
 
         private static DateTime _lastWrite = DateTime.MinValue;
         private static string _lastMsg = "";
@@ -58,8 +60,30 @@ namespace BS.CAD.Tools.Utils
 
         private static void WriteInternal(string level, string msg, string caller)
         {
+            EnsureLogSize();
+
             string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{level}] [{caller}] {msg}";
             File.AppendAllText(LogPath, line + Environment.NewLine);
+        }
+
+        private static void EnsureLogSize()
+        {
+            try
+            {
+                if (!File.Exists(LogPath))
+                    return;
+
+                var info = new FileInfo(LogPath);
+                if (info.Length <= MaxLogBytes)
+                    return;
+
+                string backupPath = Path.Combine(LogDir, BackupLogFileName);
+                if (File.Exists(backupPath))
+                    File.Delete(backupPath);
+
+                File.Move(LogPath, backupPath);
+            }
+            catch { }
         }
     }
 }

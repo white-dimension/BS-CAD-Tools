@@ -1,5 +1,4 @@
 using Autodesk.AutoCAD.ApplicationServices;
-// Color is used via fully qualified name to avoid ambiguity with System.Drawing.Color
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Runtime;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
@@ -15,21 +14,9 @@ namespace BS.CAD.Tools.Commands
         {
             var doc = AcadApp.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
-            Database db = doc.Database;
-            using (Transaction tr = db.TransactionManager.StartTransaction())
-            {
-                LayerTable? lt = tr.GetObject(db.LayerTableId, OpenMode.ForRead) as LayerTable;
-                if (lt == null) return;
-                if (!lt.Has("My_Standard_Layer"))
-                {
-                    var ltr = new LayerTableRecord();
-                    ltr.Name = "My_Standard_Layer";
-                    ltr.Color = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, 1);
-                    lt.UpgradeOpen(); lt.Add(ltr); tr.AddNewlyCreatedDBObject(ltr, true);
-                }
-                tr.Commit();
-                doc.Editor.WriteMessage("\n[成功] 标准化环境已建立。");
-            }
+
+            Logger.Info("BZ invoked as safe placeholder. Standard config is not wired yet; drawing was not modified.");
+            doc.Editor.WriteMessage("\n[提示] BZ 标准环境初始化入口已保留；标准配置尚未接入，当前不会修改图纸。");
         }
 
         [CommandMethod("SETBYLAYER")]
@@ -37,37 +24,77 @@ namespace BS.CAD.Tools.Commands
         {
             Document doc = AcadApp.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
+
             Database db = doc.Database;
+            int count = 0;
+            int skipped = 0;
+            int errors = 0;
+
             using (doc.LockDocument())
             using (Transaction tr = db.TransactionManager.StartTransaction())
             {
                 BlockTable? bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead) as BlockTable;
                 if (bt == null) return;
-                int count = 0;
-                foreach (ObjectId btrId in bt)
+
+                string[] targetSpaces =
                 {
-                    BlockTableRecord? btr = tr.GetObject(btrId, OpenMode.ForRead) as BlockTableRecord;
-                    if (btr == null) continue;
+                    BlockTableRecord.ModelSpace,
+                    BlockTableRecord.PaperSpace
+                };
+
+                foreach (string spaceName in targetSpaces)
+                {
+                    if (!bt.Has(spaceName))
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    BlockTableRecord? btr = tr.GetObject(bt[spaceName], OpenMode.ForRead) as BlockTableRecord;
+                    if (btr == null || btr.IsErased || btr.IsDisposed || btr.IsFromExternalReference || btr.IsDependent)
+                    {
+                        skipped++;
+                        continue;
+                    }
+
                     foreach (ObjectId entId in btr)
                     {
                         try
                         {
                             Entity? ent = tr.GetObject(entId, OpenMode.ForRead, false) as Entity;
-                            if (ent != null && (ent.ColorIndex != 256 || ent.Linetype != "ByLayer" || ent.LineWeight != LineWeight.ByLayer))
+                            if (ent == null || ent.IsErased || ent.IsDisposed)
                             {
-                                ent.UpgradeOpen();
-                                ent.ColorIndex = 256;
-                                ent.Linetype = "ByLayer";
-                                ent.LineWeight = LineWeight.ByLayer;
-                                count++;
+                                skipped++;
+                                continue;
                             }
+
+                            bool needChange =
+                                ent.ColorIndex != 256 ||
+                                !string.Equals(ent.Linetype, "ByLayer", System.StringComparison.OrdinalIgnoreCase) ||
+                                ent.LineWeight != LineWeight.ByLayer;
+
+                            if (!needChange)
+                                continue;
+
+                            ent.UpgradeOpen();
+                            ent.ColorIndex = 256;
+                            ent.Linetype = "ByLayer";
+                            ent.LineWeight = LineWeight.ByLayer;
+                            count++;
                         }
-                        catch (System.Exception ex) { Logger.Error(ex); }
+                        catch (System.Exception ex)
+                        {
+                            errors++;
+                            Logger.Error(ex);
+                        }
                     }
                 }
+
                 tr.Commit();
-                doc.Editor.WriteMessage($"\n[成功] 已处理 {count} 个物体。");
             }
+
+            Logger.Info($"SETBYLAYER completed. Changed={count}, Skipped={skipped}, Errors={errors}");
+            doc.Editor.WriteMessage($"\n[成功] 已处理 {count} 个对象，跳过 {skipped} 个对象，错误 {errors} 个。默认仅处理模型空间和图纸空间，不处理块定义。");
         }
     }
 }

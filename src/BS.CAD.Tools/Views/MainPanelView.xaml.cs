@@ -42,8 +42,10 @@ namespace BS.CAD.Tools.Views
             {
                 Interval = TimeSpan.FromSeconds(0.5)
             };
-            _timer.Tick += (s, e) => UpdateCurrentIMEDisplay();
+            _timer.Tick += OnImeTimerTick;
             _timer.Start();
+
+            Unloaded += OnMainPanelUnloaded;
         }
 
         private void ConfigureIme()
