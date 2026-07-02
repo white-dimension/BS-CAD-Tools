@@ -62,7 +62,7 @@ namespace BS.CAD.Tools.Views
             {
                 var settings = _settingsService.Load();
                 LayerToolsPanel.Visibility = IsEnabled(settings, SettingsService.LayerTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-                ImeToolsPanel.Visibility = IsEnabled(settings, SettingsService.ImeTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                ImeToolsPanel.Visibility = System.Windows.Visibility.Collapsed;
                 FontToolsPanel.Visibility = IsEnabled(settings, SettingsService.FontTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
                 CleanupToolsPanel.Visibility = IsEnabled(settings, SettingsService.CleanupTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
                 StandardToolsPanel.Visibility = IsEnabled(settings, SettingsService.StandardTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;

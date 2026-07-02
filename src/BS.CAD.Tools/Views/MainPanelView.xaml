@@ -522,7 +522,7 @@
                     </Grid>
                 </Border>
 
-                <Border Style="{StaticResource CardStyle}" Background="#1A2027">
+                <Border Style="{StaticResource CardStyle}" Background="#1A2027" Visibility="Collapsed">
                     <DockPanel LastChildFill="True">
                         <Border DockPanel.Dock="Right" Style="{StaticResource BadgeStyle}" Visibility="Collapsed">
                             <TextBlock Text="IME" Foreground="#AFCBFF" FontSize="11" FontWeight="SemiBold"/>
@@ -649,7 +649,7 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Border Grid.Row="1" Background="#0D1013" BorderBrush="#252B32" BorderThickness="0,1,0,0" Padding="12,9">
+        <Border Grid.Row="1" Background="#0D1013" BorderBrush="#252B32" BorderThickness="0,1,0,0" Padding="12,9" Visibility="Collapsed">
             <TextBlock x:Name="TxtStatus" Text="就绪" Foreground="{StaticResource TextSub}" FontSize="12" TextWrapping="Wrap"/>
         </Border>
     </Grid>
