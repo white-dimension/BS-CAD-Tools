@@ -12,7 +12,7 @@ namespace BS.CAD.Tools
     {
         public static IntPtr TargetChineseHKL = IntPtr.Zero;
         public static IntPtr TargetEnglishHKL = IntPtr.Zero;
-        private static bool _lastWasText = false;
+        private static bool _lastNeedsChineseInput = false;
 
         public static string SelectedShx = "txt.shx";
         public static string SelectedBigFont = "gbcbig.shx";
@@ -93,14 +93,14 @@ namespace BS.CAD.Tools
             try
             {
                 string cmdNames = AcadApp.GetSystemVariable("CMDNAMES")?.ToString() ?? "";
-                if (string.IsNullOrEmpty(cmdNames) && _lastWasText)
+                if (string.IsNullOrEmpty(cmdNames) && _lastNeedsChineseInput)
                 {
                     if (!CadImeBridge.Notify("TextEditEnded", "en", "CAD 命令模式"))
                     {
                         SwitchToIME(TargetEnglishHKL);
                     }
 
-                    _lastWasText = false;
+                    _lastNeedsChineseInput = false;
                 }
             }
             catch (System.Exception ex) { Logger.Error(ex); }
@@ -109,14 +109,121 @@ namespace BS.CAD.Tools
         private void DocumentManager_DocumentLockModeChanged(object sender, DocumentLockModeChangedEventArgs e)
         {
             string cmd = e.GlobalCommandName?.ToUpper() ?? "";
-            if (cmd.Contains("TEXT") || cmd.Contains("ATTEDIT") || cmd.Contains("MTEDIT") || cmd == "T" || cmd == "MTEXT")
+            if (NeedsChineseInput(cmd))
             {
-                _lastWasText = true;
-                if (!CadImeBridge.Notify("TextEditStarted", "zh", "CAD 文字编辑"))
+                _lastNeedsChineseInput = true;
+                if (!CadImeBridge.Notify("TextEditStarted", "zh", GetChineseInputMode(cmd)))
                 {
                     SwitchToIME(TargetChineseHKL);
                 }
             }
+        }
+
+        private static bool NeedsChineseInput(string cmd)
+        {
+            if (string.IsNullOrWhiteSpace(cmd)) return false;
+
+            return IsTextCommand(cmd)
+                   || IsAttributeCommand(cmd)
+                   || IsMLeaderCommand(cmd)
+                   || IsNamingCommand(cmd)
+                   || IsTableOrFieldCommand(cmd)
+                   || IsDimensionTextCommand(cmd)
+                   || IsPropertiesCommand(cmd);
+        }
+
+        private static string GetChineseInputMode(string cmd)
+        {
+            if (IsAttributeCommand(cmd)) return "CAD 块属性编辑";
+            if (IsMLeaderCommand(cmd)) return "CAD 多重引线编辑";
+            if (IsNamingCommand(cmd)) return "CAD 名称/说明编辑";
+            if (IsTableOrFieldCommand(cmd)) return "CAD 表格/字段编辑";
+            if (IsDimensionTextCommand(cmd)) return "CAD 标注文字编辑";
+            if (IsPropertiesCommand(cmd)) return "CAD 特性编辑";
+            return "CAD 文字编辑";
+        }
+
+        private static bool IsTextCommand(string cmd)
+        {
+            return cmd == "T"
+                   || cmd == "TEXT"
+                   || cmd == "DTEXT"
+                   || cmd == "MTEXT"
+                   || cmd == "MTEDIT"
+                   || cmd == "DDEDIT"
+                   || cmd == "ED"
+                   || cmd.Contains("TEXT");
+        }
+
+        private static bool IsAttributeCommand(string cmd)
+        {
+            return cmd == "ATTEDIT"
+                   || cmd == "ATTIPEDIT"
+                   || cmd == "EATTEDIT"
+                   || cmd == "DDATTE"
+                   || cmd == "BATTMAN"
+                   || cmd == "BATTORDER"
+                   || cmd.Contains("ATTRIB")
+                   || cmd.Contains("ATTDEF");
+        }
+
+        private static bool IsMLeaderCommand(string cmd)
+        {
+            return cmd == "MLEADER"
+                   || cmd == "MLEADEREDIT"
+                   || cmd == "MLEADERSTYLE"
+                   || cmd.Contains("MLEADER");
+        }
+
+        private static bool IsNamingCommand(string cmd)
+        {
+            return cmd == "LAYER"
+                   || cmd == "CLASSICLAYER"
+                   || cmd == "LA"
+                   || cmd == "RENAME"
+                   || cmd == "-RENAME"
+                   || cmd == "BLOCK"
+                   || cmd == "-BLOCK"
+                   || cmd == "BEDIT"
+                   || cmd == "REFEDIT"
+                   || cmd == "WBLOCK"
+                   || cmd == "STYLE"
+                   || cmd == "DIMSTYLE"
+                   || cmd == "LAYOUT"
+                   || cmd == "UCSMAN"
+                   || cmd.Contains("LAYER")
+                   || cmd.Contains("BLOCK")
+                   || cmd.Contains("STYLE");
+        }
+
+        private static bool IsTableOrFieldCommand(string cmd)
+        {
+            return cmd == "TABLE"
+                   || cmd == "TABLEDIT"
+                   || cmd == "TABLESTYLE"
+                   || cmd == "FIELD"
+                   || cmd == "UPDATEFIELD"
+                   || cmd.Contains("TABLE")
+                   || cmd.Contains("FIELD");
+        }
+
+        private static bool IsDimensionTextCommand(string cmd)
+        {
+            return cmd == "DIM"
+                   || cmd == "DIMEDIT"
+                   || cmd == "DIMTEDIT"
+                   || cmd == "QDIM"
+                   || cmd.Contains("DIM");
+        }
+
+        private static bool IsPropertiesCommand(string cmd)
+        {
+            return cmd == "PROPERTIES"
+                   || cmd == "PR"
+                   || cmd == "CHPROP"
+                   || cmd == "CHANGE"
+                   || cmd == "MATCHPROP"
+                   || cmd.Contains("PROPERTIES");
         }
 
         public static void SwitchToIME(IntPtr hKL)
