@@ -43,6 +43,7 @@ namespace BS.CAD.Tools
 
             AcadApp.DocumentManager.DocumentLockModeChanged += DocumentManager_DocumentLockModeChanged;
             AcadApp.Idle += AcadApp_Idle;
+            CadImeBridge.Notify("PluginReady", "en", "CAD 插件已连接");
             Logger.Info("插件已初始化，输入法监听已启动");
             TraceLog.Step("CadApp.Initialize: DONE");
         }
@@ -81,6 +82,7 @@ namespace BS.CAD.Tools
             {
                 AcadApp.DocumentManager.DocumentLockModeChanged -= DocumentManager_DocumentLockModeChanged;
                 AcadApp.Idle -= AcadApp_Idle;
+                CadImeBridge.Notify("PluginDisconnected", "en", "CAD 插件已断开");
                 Logger.Info("插件已卸载，输入法监听已停止");
             }
             catch (System.Exception ex) { Logger.Error(ex); }
@@ -93,7 +95,11 @@ namespace BS.CAD.Tools
                 string cmdNames = AcadApp.GetSystemVariable("CMDNAMES")?.ToString() ?? "";
                 if (string.IsNullOrEmpty(cmdNames) && _lastWasText)
                 {
-                    SwitchToIME(TargetEnglishHKL);
+                    if (!CadImeBridge.Notify("TextEditEnded", "en", "CAD 命令模式"))
+                    {
+                        SwitchToIME(TargetEnglishHKL);
+                    }
+
                     _lastWasText = false;
                 }
             }
@@ -106,7 +112,10 @@ namespace BS.CAD.Tools
             if (cmd.Contains("TEXT") || cmd.Contains("ATTEDIT") || cmd.Contains("MTEDIT") || cmd == "T" || cmd == "MTEXT")
             {
                 _lastWasText = true;
-                SwitchToIME(TargetChineseHKL);
+                if (!CadImeBridge.Notify("TextEditStarted", "zh", "CAD 文字编辑"))
+                {
+                    SwitchToIME(TargetChineseHKL);
+                }
             }
         }
 
