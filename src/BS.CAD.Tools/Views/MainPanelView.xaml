@@ -642,7 +642,7 @@
                                    FontSize="12"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,4"/>
-                        <DockPanel Margin="0,0,0,8">
+                        <DockPanel Margin="0,0,0,10">
                             <Button Content="刷新检测" FontSize="11" Padding="6,2" DockPanel.Dock="Right"
                                     Background="#252B32" Foreground="{StaticResource TextSub}"
                                     BorderThickness="0" Cursor="Hand"
@@ -651,22 +651,42 @@
                                        Foreground="{StaticResource TextSub}" FontSize="12"
                                        VerticalAlignment="Center"/>
                         </DockPanel>
-                        <Button Content="初始化标准环境" Style="{StaticResource DangerButtonStyle}" Click="OnBtnBsInitClick"
-                                ToolTip="执行 BS_INIT：初始化当前图纸标准环境。建议先保存图纸。"/>
-                        <Button Content="检查图层标准" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCheckClick"
-                                ToolTip="执行 BS_CHECK"/>
-                        <Button Content="补齐缺失图层" Style="{StaticResource DangerButtonStyle}" Click="OnBtnBsFixMissingClick"
-                                ToolTip="执行 BS_FIX_MISSING：补齐缺失的标准图层。建议先保存图纸。"/>
+
+                        <!-- 分组 1：初始化 -->
+                        <TextBlock Text="初始化" Style="{StaticResource LabelTextStyle}" Margin="0,0,0,2"/>
+                        <TextBlock Text="创建或补齐当前图纸的 BS 标准环境。" Foreground="{StaticResource TextMute}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                        <Button Content="初始化标准环境" Style="{StaticResource PrimaryButtonStyle}" Click="OnBtnBsInitClick"
+                                ToolTip="执行 BS_INIT：初始化当前图纸标准环境。建议先保存图纸。" Margin="0,0,0,8"/>
+
+                        <!-- 分组 2：图层标准 -->
+                        <TextBlock Text="图层标准" Style="{StaticResource LabelTextStyle}" Margin="0,0,0,2"/>
+                        <TextBlock Text="检查当前图纸图层是否符合 BS 标准，并补齐缺失标准图层。" Foreground="{StaticResource TextMute}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <Button Content="检查图层标准" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCheckClick"
+                                    ToolTip="执行 BS_CHECK" Width="160" Margin="0,0,8,0"/>
+                            <Button Content="补齐缺失图层" Style="{StaticResource DangerButtonStyle}" Click="OnBtnBsFixMissingClick"
+                                    ToolTip="执行 BS_FIX_MISSING：补齐缺失的标准图层。建议先保存图纸。"/>
+                        </StackPanel>
+
+                        <!-- 分组 3：图层显示 -->
+                        <TextBlock Text="图层显示" Style="{StaticResource LabelTextStyle}" Margin="0,0,0,2"/>
+                        <TextBlock Text="按工作阶段切换图层显示，或恢复全部图层。" Foreground="{StaticResource TextMute}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <Button Content="图层模式切换" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsLayerModeClick"
+                                    ToolTip="执行 BS_LAYER_MODE" Width="160" Margin="0,0,8,0"/>
+                            <Button Content="恢复全部图层" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsLayerAllClick"
+                                    ToolTip="执行 BS_LAYER_ALL"/>
+                        </StackPanel>
+
+                        <!-- 分组 4：CTB / 模板 -->
+                        <TextBlock Text="CTB / 模板" Style="{StaticResource LabelTextStyle}" Margin="0,0,0,2"/>
+                        <TextBlock Text="检查打印颜色规则、导出 CTB 编辑器表，并诊断模板基础环境。" Foreground="{StaticResource TextMute}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4"/>
                         <Button Content="检查 CTB 颜色规则" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCtbCheckClick"
                                 ToolTip="执行 BS_CTB_CHECK"/>
                         <Button Content="导出 CTB 编辑器表" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCtbExportClick"
                                 ToolTip="执行 BS_CTB_EXPORT"/>
                         <Button Content="模板基础环境检查" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsTemplateCheckClick"
                                 ToolTip="执行 BS_TEMPLATE_CHECK"/>
-                        <Button Content="图层模式切换" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsLayerModeClick"
-                                ToolTip="执行 BS_LAYER_MODE"/>
-                        <Button Content="恢复全部图层" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsLayerAllClick"
-                                ToolTip="执行 BS_LAYER_ALL"/>
                     </StackPanel>
                 </Border>
             </StackPanel>

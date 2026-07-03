@@ -2,7 +2,17 @@
 
 AutoCAD 设计辅助插件。当前阶段定位为 **IME Core**：先把输入法自动切换和主面板基础壳打稳，其他会修改图纸的模块先保留代码、保留命令，但默认不在主面板开放。
 
-## 当前阶段：v0.3-standard-status
+## 当前阶段：v0.5-layout-polish
+
+StandardTools 模块完成分组整理，将 BS 标准工具入口划分为：
+- 初始化
+- 图层标准
+- 图层显示
+- CTB / 模板
+
+本阶段只优化面板结构，不新增业务功能。
+
+## 前期阶段：v0.3-standard-status
 
 StandardTools 模块新增 BS-CAD-Standard 加载状态检测：
 - 面板显示 BS-CAD-Standard 是否已加载
