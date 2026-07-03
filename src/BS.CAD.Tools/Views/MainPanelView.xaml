@@ -637,11 +637,20 @@
                             </Border>
                             <TextBlock Text="BS 标准工具" Style="{StaticResource SectionTitleStyle}"/>
                         </DockPanel>
-                        <TextBlock Text="调用 BS-CAD-Standard 插件中的标准化命令。请确保已 NETLOAD BS_CAD_STANDARD_V10_Plugin.dll。"
+                        <TextBlock Text="调用 BS-CAD-Standard 插件中的标准化命令。"
                                    Foreground="{StaticResource TextSub}"
                                    FontSize="12"
                                    TextWrapping="Wrap"
-                                   Margin="0,0,0,8"/>
+                                   Margin="0,0,0,4"/>
+                        <DockPanel Margin="0,0,0,8">
+                            <Button Content="刷新检测" FontSize="11" Padding="6,2" DockPanel.Dock="Right"
+                                    Background="#252B32" Foreground="{StaticResource TextSub}"
+                                    BorderThickness="0" Cursor="Hand"
+                                    Click="OnBtnRefreshStandardStatusClick"/>
+                            <TextBlock x:Name="TxtStandardPluginStatus" Text="BS-CAD-Standard：检测中..."
+                                       Foreground="{StaticResource TextSub}" FontSize="12"
+                                       VerticalAlignment="Center"/>
+                        </DockPanel>
                         <Button Content="初始化标准环境" Style="{StaticResource DangerButtonStyle}" Click="OnBtnBsInitClick"
                                 ToolTip="执行 BS_INIT：初始化当前图纸标准环境。建议先保存图纸。"/>
                         <Button Content="检查图层标准" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCheckClick"

@@ -25,6 +25,7 @@ namespace BS.CAD.Tools.Views
         private readonly DispatcherTimer _timer;
         private readonly CadEngine _engine = CadEngine.Current;
         private readonly SettingsService _settingsService = new();
+        private bool _isStandardPluginLoaded;
 
         [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
         private static extern uint ImmGetDescription(IntPtr hKL, StringBuilder lpszDescription, uint uBufLen);
@@ -36,6 +37,7 @@ namespace BS.CAD.Tools.Views
             LoadInstalledInputLanguages();
             LoadLocalFonts();
             ApplyModuleVisibility();
+            RefreshStandardPluginStatus();
             SetStatus("就绪");
 
             _timer = new DispatcherTimer
@@ -593,6 +595,9 @@ namespace BS.CAD.Tools.Views
 
         private void OnBtnBsInitClick(object sender, RoutedEventArgs e)
         {
+            if (!EnsureStandardPluginLoaded())
+                return;
+
             if (!ConfirmDanger("BS_INIT 会初始化当前图纸的标准环境，可能创建图层、文字样式、标注样式并修改单位设置。\n\n建议先保存图纸。是否继续？"))
                 return;
 
@@ -601,11 +606,17 @@ namespace BS.CAD.Tools.Views
 
         private void OnBtnBsCheckClick(object sender, RoutedEventArgs e)
         {
+            if (!EnsureStandardPluginLoaded())
+                return;
+
             ExecuteCommand("BS_CHECK ", "检查图层标准");
         }
 
         private void OnBtnBsFixMissingClick(object sender, RoutedEventArgs e)
         {
+            if (!EnsureStandardPluginLoaded())
+                return;
+
             if (!ConfirmDanger("BS_FIX_MISSING 会向当前图纸补齐缺失的标准图层。\n\n建议先保存图纸。是否继续？"))
                 return;
 
@@ -614,16 +625,25 @@ namespace BS.CAD.Tools.Views
 
         private void OnBtnBsCtbCheckClick(object sender, RoutedEventArgs e)
         {
+            if (!EnsureStandardPluginLoaded())
+                return;
+
             ExecuteCommand("BS_CTB_CHECK ", "检查 CTB 颜色规则");
         }
 
         private void OnBtnBsCtbExportClick(object sender, RoutedEventArgs e)
         {
+            if (!EnsureStandardPluginLoaded())
+                return;
+
             ExecuteCommand("BS_CTB_EXPORT ", "导出 CTB 编辑器表");
         }
 
         private void OnBtnBsTemplateCheckClick(object sender, RoutedEventArgs e)
         {
+            if (!EnsureStandardPluginLoaded())
+                return;
+
             ExecuteCommand("BS_TEMPLATE_CHECK ", "模板基础环境检查");
         }
 
@@ -644,6 +664,54 @@ namespace BS.CAD.Tools.Views
             CadApp.SelectedShx = ComboShx.Text;
             CadApp.SelectedBigFont = ComboBoxBig.Text;
             ExecuteCommand("FIXFONTS ", "修复全图字体");
+        }
+
+        private static bool IsStandardPluginLoaded()
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a =>
+                {
+                    string name = a.GetName().Name ?? string.Empty;
+                    return name.Contains("BS_CAD_STANDARD", StringComparison.OrdinalIgnoreCase)
+                        || name.Contains("BS-CAD-Standard", StringComparison.OrdinalIgnoreCase);
+                });
+        }
+
+        private void RefreshStandardPluginStatus()
+        {
+            _isStandardPluginLoaded = IsStandardPluginLoaded();
+
+            if (TxtStandardPluginStatus == null)
+                return;
+
+            TxtStandardPluginStatus.Text = _isStandardPluginLoaded
+                ? "BS-CAD-Standard：已加载"
+                : "BS-CAD-Standard：未检测到，请先 NETLOAD BS_CAD_STANDARD_V10_Plugin.dll";
+
+            TxtStandardPluginStatus.Foreground = _isStandardPluginLoaded
+                ? System.Windows.Media.Brushes.LightGreen
+                : System.Windows.Media.Brushes.Orange;
+        }
+
+        private void OnBtnRefreshStandardStatusClick(object sender, RoutedEventArgs e)
+        {
+            RefreshStandardPluginStatus();
+        }
+
+        private bool EnsureStandardPluginLoaded()
+        {
+            RefreshStandardPluginStatus();
+
+            if (_isStandardPluginLoaded)
+                return true;
+
+            System.Windows.MessageBox.Show(
+                "未检测到 BS-CAD-Standard 插件。\n\n请先使用 NETLOAD 加载 BS_CAD_STANDARD_V10_Plugin.dll。",
+                "CAD助手",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+
+            return false;
         }
 
         private void ExecuteCommand(string command, string description)

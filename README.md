@@ -2,7 +2,15 @@
 
 AutoCAD 设计辅助插件。当前阶段定位为 **IME Core**：先把输入法自动切换和主面板基础壳打稳，其他会修改图纸的模块先保留代码、保留命令，但默认不在主面板开放。
 
-## 当前阶段：IME Core
+## 当前阶段：v0.3-standard-status
+
+StandardTools 模块新增 BS-CAD-Standard 加载状态检测：
+- 面板显示 BS-CAD-Standard 是否已加载
+- 未检测到时点击标准工具按钮会提示先 NETLOAD `BS_CAD_STANDARD_V10_Plugin.dll`
+- 面板提供"刷新检测"按钮
+- StandardTools 只检测程序集是否已加载，不校验插件版本，不自动加载 DLL
+
+## 前期阶段：IME Core
 
 当前默认只开放：
 
