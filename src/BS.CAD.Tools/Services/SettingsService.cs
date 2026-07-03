@@ -13,6 +13,8 @@ namespace BS.CAD.Tools.Services
     /// </summary>
     public class SettingsService
     {
+        private const int CurrentSettingsSchemaVersion = 1;
+
         public const string LayerTools = "LayerTools";
         public const string ImeTools = "ImeTools";
         public const string FontTools = "FontTools";
@@ -51,7 +53,10 @@ namespace BS.CAD.Tools.Services
 
                 string json = File.ReadAllText(SettingsFilePath);
                 var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? CreateDefaultSettings();
-                Normalize(settings);
+                bool changed = Normalize(settings);
+                if (changed)
+                    Save(settings);
+
                 return settings;
             }
             catch (Exception ex)
@@ -97,12 +102,13 @@ namespace BS.CAD.Tools.Services
             {
                 EnabledModules = new Dictionary<string, bool>
                 {
-                    [LayerTools] = true,
+                    [LayerTools] = false,
                     [ImeTools] = true,
-                    [FontTools] = true,
+                    [FontTools] = false,
                     [CleanupTools] = false,
                     [StandardTools] = false
-                }
+                },
+                SettingsSchemaVersion = CurrentSettingsSchemaVersion
             };
         }
 
@@ -121,16 +127,30 @@ namespace BS.CAD.Tools.Services
                 Directory.CreateDirectory(AppDataDirectory);
         }
 
-        private static void Normalize(AppSettings settings)
+        private static bool Normalize(AppSettings settings)
         {
+            bool changed = false;
+
+            if (settings.SettingsSchemaVersion < CurrentSettingsSchemaVersion)
+            {
+                settings.EnabledModules = new Dictionary<string, bool>(CreateDefaultSettings().EnabledModules);
+                settings.SettingsSchemaVersion = CurrentSettingsSchemaVersion;
+                changed = true;
+            }
+
             settings.EnabledModules ??= new Dictionary<string, bool>();
 
             var defaults = CreateDefaultSettings().EnabledModules;
             foreach (var pair in defaults)
             {
                 if (!settings.EnabledModules.ContainsKey(pair.Key))
+                {
                     settings.EnabledModules[pair.Key] = pair.Value;
+                    changed = true;
+                }
             }
+
+            return changed;
         }
     }
 }

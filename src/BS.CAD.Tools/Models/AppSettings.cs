@@ -4,6 +4,8 @@ namespace BS.CAD.Tools.Models
 {
     public class AppSettings
     {
+        public int SettingsSchemaVersion { get; set; }
+
         public Dictionary<string, bool> EnabledModules { get; set; } = new();
 
         /// <summary>
