@@ -23,7 +23,11 @@ AutoCAD 设计辅助插件。当前阶段定位为 **IME Core**：先把输入�
 
 这些功能后续会按模块逐步接回。当前目标是先确认启动、输入法切换、主面板、设置保存和日志都稳定。
 
-StandardTools 模块已预留 BS-CAD-Standard 命令入口。当前为按钮调用模式，需要同时加载 BS-CAD-Standard 插件 DLL，BS-CAD-Tools 不直接实现标准化业务逻辑。
+StandardTools 模块已完成第一版接入，可通过主面板按钮调用 BS-CAD-Standard 插件命令。需要同时 NETLOAD：
+- `BS.CAD.Tools.dll`
+- `BS_CAD_STANDARD_V10_Plugin.dll`
+
+BS-CAD-Tools 仅通过 `SendStringToExecute` 发送命令，不直接实现标准化业务逻辑。
 
 ## 模块默认状态
 

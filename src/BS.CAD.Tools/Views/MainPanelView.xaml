@@ -642,18 +642,18 @@
                                    FontSize="12"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,8"/>
-                        <Button Content="初始化标准环境  BS_INIT" Style="{StaticResource DangerButtonStyle}" Click="OnBtnBsInitClick"
-                                ToolTip="初始化当前图纸标准环境（图层/文字/标注/单位）。建议先保存图纸。"/>
-                        <Button Content="检查图层标准  BS_CHECK" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCheckClick"
-                                ToolTip="检查当前图纸图层是否符合 BS 标准。"/>
-                        <Button Content="补齐缺失图层  BS_FIX_MISSING" Style="{StaticResource DangerButtonStyle}" Click="OnBtnBsFixMissingClick"
-                                ToolTip="补齐当前图纸缺失的标准图层。建议先保存图纸。"/>
-                        <Button Content="检查 CTB 颜色规则  BS_CTB_CHECK" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCtbCheckClick"
-                                ToolTip="检查图层颜色是否符合 CTB 规则。"/>
-                        <Button Content="导出 CTB 编辑器表  BS_CTB_EXPORT" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCtbExportClick"
-                                ToolTip="导出 CTB 规则为 Markdown / CSV。"/>
-                        <Button Content="模板基础环境检查  BS_TEMPLATE_CHECK" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsTemplateCheckClick"
-                                ToolTip="检查当前 DWG 的模板基础环境（单位/图层/CTB/样式/布局）。"/>
+                        <Button Content="初始化标准环境" Style="{StaticResource DangerButtonStyle}" Click="OnBtnBsInitClick"
+                                ToolTip="执行 BS_INIT：初始化当前图纸标准环境。建议先保存图纸。"/>
+                        <Button Content="检查图层标准" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCheckClick"
+                                ToolTip="执行 BS_CHECK"/>
+                        <Button Content="补齐缺失图层" Style="{StaticResource DangerButtonStyle}" Click="OnBtnBsFixMissingClick"
+                                ToolTip="执行 BS_FIX_MISSING：补齐缺失的标准图层。建议先保存图纸。"/>
+                        <Button Content="检查 CTB 颜色规则" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCtbCheckClick"
+                                ToolTip="执行 BS_CTB_CHECK"/>
+                        <Button Content="导出 CTB 编辑器表" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsCtbExportClick"
+                                ToolTip="执行 BS_CTB_EXPORT"/>
+                        <Button Content="模板基础环境检查" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsTemplateCheckClick"
+                                ToolTip="执行 BS_TEMPLATE_CHECK"/>
                     </StackPanel>
                 </Border>
             </StackPanel>
