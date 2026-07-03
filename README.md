@@ -23,6 +23,8 @@ AutoCAD 设计辅助插件。当前阶段定位为 **IME Core**：先把输入�
 
 这些功能后续会按模块逐步接回。当前目标是先确认启动、输入法切换、主面板、设置保存和日志都稳定。
 
+StandardTools 模块已预留 BS-CAD-Standard 命令入口。当前为按钮调用模式，需要同时加载 BS-CAD-Standard 插件 DLL，BS-CAD-Tools 不直接实现标准化业务逻辑。
+
 ## 模块默认状态
 
 首次运行或旧配置迁移后，模块默认值为：
@@ -66,7 +68,7 @@ src/BS.CAD.Tools/bin/Debug/net10.0-windows/BS.CAD.Tools.dll
 | `FIXFONTS` | 命令保留，主面板默认隐藏 |
 | `TS` | 命令保留，主面板默认隐藏 |
 | `SETBYLAYER` | 命令保留，主面板默认隐藏，仅处理模型空间和图纸空间 |
-| `BZ` | 安全占位，不修改图纸 |
+| `BZ` | 安全占位，不修改图纸（StandardTools 面板已改用 BS-CAD-Standard 命令） |
 
 ## 后续路线
 

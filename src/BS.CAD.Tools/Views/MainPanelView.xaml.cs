@@ -591,13 +591,40 @@ namespace BS.CAD.Tools.Views
             ExecuteCommand("TS ", "标准化文字");
         }
 
-        private void OnBtnStandardClick(object sender, RoutedEventArgs e)
+        private void OnBtnBsInitClick(object sender, RoutedEventArgs e)
         {
-            if (!ConfirmDanger("BZ 目前是测试入口，暂未对接 BS-CAD-Standard。\n\n是否继续执行标准环境初始化？"))
+            if (!ConfirmDanger("BS_INIT 会初始化当前图纸的标准环境，可能创建图层、文字样式、标注样式并修改单位设置。\n\n建议先保存图纸。是否继续？"))
                 return;
 
-            CadApp.SwitchToIME(CadApp.TargetEnglishHKL);
-            ExecuteCommand("BZ ", "标准环境初始化");
+            ExecuteCommand("BS_INIT ", "初始化标准环境");
+        }
+
+        private void OnBtnBsCheckClick(object sender, RoutedEventArgs e)
+        {
+            ExecuteCommand("BS_CHECK ", "检查图层标准");
+        }
+
+        private void OnBtnBsFixMissingClick(object sender, RoutedEventArgs e)
+        {
+            if (!ConfirmDanger("BS_FIX_MISSING 会向当前图纸补齐缺失的标准图层。\n\n建议先保存图纸。是否继续？"))
+                return;
+
+            ExecuteCommand("BS_FIX_MISSING ", "补齐缺失图层");
+        }
+
+        private void OnBtnBsCtbCheckClick(object sender, RoutedEventArgs e)
+        {
+            ExecuteCommand("BS_CTB_CHECK ", "检查 CTB 颜色规则");
+        }
+
+        private void OnBtnBsCtbExportClick(object sender, RoutedEventArgs e)
+        {
+            ExecuteCommand("BS_CTB_EXPORT ", "导出 CTB 编辑器表");
+        }
+
+        private void OnBtnBsTemplateCheckClick(object sender, RoutedEventArgs e)
+        {
+            ExecuteCommand("BS_TEMPLATE_CHECK ", "模板基础环境检查");
         }
 
         private void OnBtnByLayerClick(object sender, RoutedEventArgs e)
