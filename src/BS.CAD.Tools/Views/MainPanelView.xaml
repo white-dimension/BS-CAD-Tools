@@ -663,6 +663,10 @@
                                 ToolTip="执行 BS_CTB_EXPORT"/>
                         <Button Content="模板基础环境检查" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsTemplateCheckClick"
                                 ToolTip="执行 BS_TEMPLATE_CHECK"/>
+                        <Button Content="图层模式切换" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsLayerModeClick"
+                                ToolTip="执行 BS_LAYER_MODE"/>
+                        <Button Content="恢复全部图层" Style="{StaticResource ToolButtonStyle}" Click="OnBtnBsLayerAllClick"
+                                ToolTip="执行 BS_LAYER_ALL"/>
                     </StackPanel>
                 </Border>
             </StackPanel>

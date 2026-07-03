@@ -647,6 +647,22 @@ namespace BS.CAD.Tools.Views
             ExecuteCommand("BS_TEMPLATE_CHECK ", "模板基础环境检查");
         }
 
+        private void OnBtnBsLayerModeClick(object sender, RoutedEventArgs e)
+        {
+            if (!EnsureStandardPluginLoaded())
+                return;
+
+            ExecuteCommand("BS_LAYER_MODE ", "图层模式切换");
+        }
+
+        private void OnBtnBsLayerAllClick(object sender, RoutedEventArgs e)
+        {
+            if (!EnsureStandardPluginLoaded())
+                return;
+
+            ExecuteCommand("BS_LAYER_ALL ", "恢复全部图层");
+        }
+
         private void OnBtnByLayerClick(object sender, RoutedEventArgs e)
         {
             if (!ConfirmDanger("SETBYLAYER 会把全图对象的颜色、线型、线宽改为随层。\n\n这会影响图纸显示效果，建议先保存图纸。是否继续？"))
