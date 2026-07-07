@@ -63,11 +63,11 @@ namespace BS.CAD.Tools.Views
             try
             {
                 var settings = _settingsService.Load();
-                LayerToolsPanel.Visibility = IsEnabled(settings, SettingsService.LayerTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                LayerToolsPanel.Visibility = IsModuleEnabled(settings, SettingsService.LayerTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
                 ImeToolsPanel.Visibility = System.Windows.Visibility.Collapsed;
-                FontToolsPanel.Visibility = IsEnabled(settings, SettingsService.FontTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-                CleanupToolsPanel.Visibility = IsEnabled(settings, SettingsService.CleanupTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-                StandardToolsPanel.Visibility = IsEnabled(settings, SettingsService.StandardTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                FontToolsPanel.Visibility = IsModuleEnabled(settings, SettingsService.FontTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                CleanupToolsPanel.Visibility = IsModuleEnabled(settings, SettingsService.CleanupTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                StandardToolsPanel.Visibility = IsModuleEnabled(settings, SettingsService.StandardTools) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             }
             catch (Exception ex)
             {
@@ -76,7 +76,7 @@ namespace BS.CAD.Tools.Views
             }
         }
 
-        private static bool IsEnabled(AppSettings settings, string moduleKey)
+        private static bool IsModuleEnabled(AppSettings settings, string moduleKey)
         {
             return settings.EnabledModules.TryGetValue(moduleKey, out bool enabled) && enabled;
         }

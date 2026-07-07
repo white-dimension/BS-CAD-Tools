@@ -21,14 +21,14 @@ namespace BS.CAD.Tools.Views
 
         private void LoadControlsFromSettings()
         {
-            ChkLayerTools.IsChecked = IsEnabled(SettingsService.LayerTools);
-            ChkImeTools.IsChecked = IsEnabled(SettingsService.ImeTools);
-            ChkFontTools.IsChecked = IsEnabled(SettingsService.FontTools);
-            ChkCleanupTools.IsChecked = IsEnabled(SettingsService.CleanupTools);
-            ChkStandardTools.IsChecked = IsEnabled(SettingsService.StandardTools);
+            ChkLayerTools.IsChecked = IsModuleEnabled(SettingsService.LayerTools);
+            ChkImeTools.IsChecked = IsModuleEnabled(SettingsService.ImeTools);
+            ChkFontTools.IsChecked = IsModuleEnabled(SettingsService.FontTools);
+            ChkCleanupTools.IsChecked = IsModuleEnabled(SettingsService.CleanupTools);
+            ChkStandardTools.IsChecked = IsModuleEnabled(SettingsService.StandardTools);
         }
 
-        private bool IsEnabled(string key)
+        private bool IsModuleEnabled(string key)
         {
             return _settings.EnabledModules.TryGetValue(key, out bool enabled) && enabled;
         }

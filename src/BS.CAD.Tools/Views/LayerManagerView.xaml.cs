@@ -78,7 +78,6 @@ namespace BS.CAD.Tools.Views
         private Database? _watchedDb;
         private System.Windows.Point _toolbarDragStart;
         private bool _toolbarDragInitialized;
-        private bool _drawingStateLoaded;
         private bool _suppressSelectionChanged;
         private bool _suppressDbSync;
         // Reserved for Graphic Group Manager.
@@ -491,7 +490,6 @@ namespace BS.CAD.Tools.Views
                 UnwatchDatabase();
                 return;
             }
-            _drawingStateLoaded = false;
             WatchDatabase();
             RefreshLayerList();
         }
