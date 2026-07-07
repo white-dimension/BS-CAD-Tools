@@ -702,7 +702,7 @@ namespace BS.CAD.Tools.Views
 
             TxtStandardPluginStatus.Text = _isStandardPluginLoaded
                 ? "BS-CAD-Standard：已加载"
-                : "BS-CAD-Standard：未检测到，请先 NETLOAD BS_CAD_STANDARD_V10_Plugin.dll";
+                : "BS-CAD-Standard：未检测到，请先 NETLOAD BS_CAD_STANDARD_1_0_Plugin.dll";
 
             TxtStandardPluginStatus.Foreground = _isStandardPluginLoaded
                 ? System.Windows.Media.Brushes.LightGreen
@@ -722,7 +722,7 @@ namespace BS.CAD.Tools.Views
                 return true;
 
             System.Windows.MessageBox.Show(
-                "未检测到 BS-CAD-Standard 插件。\n\n请先使用 NETLOAD 加载 BS_CAD_STANDARD_V10_Plugin.dll。",
+                "未检测到 BS-CAD-Standard 插件。\n\n请先使用 NETLOAD 加载 BS_CAD_STANDARD_1_0_Plugin.dll。",
                 "CAD助手",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);

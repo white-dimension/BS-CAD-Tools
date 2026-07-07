@@ -16,7 +16,7 @@ StandardTools 模块完成分组整理，将 BS 标准工具入口划分为：
 
 StandardTools 模块新增 BS-CAD-Standard 加载状态检测：
 - 面板显示 BS-CAD-Standard 是否已加载
-- 未检测到时点击标准工具按钮会提示先 NETLOAD `BS_CAD_STANDARD_V10_Plugin.dll`
+- 未检测到时点击标准工具按钮会提示先 NETLOAD `BS_CAD_STANDARD_1_0_Plugin.dll`
 - 面板提供"刷新检测"按钮
 - StandardTools 只检测程序集是否已加载，不校验插件版本，不自动加载 DLL
 
@@ -43,7 +43,7 @@ StandardTools 模块新增 BS-CAD-Standard 加载状态检测：
 
 StandardTools 模块已完成第一版接入，可通过主面板按钮调用 BS-CAD-Standard 插件命令。需要同时 NETLOAD：
 - `BS.CAD.Tools.dll`
-- `BS_CAD_STANDARD_V10_Plugin.dll`
+- `BS_CAD_STANDARD_1_0_Plugin.dll`
 
 BS-CAD-Tools 仅通过 `SendStringToExecute` 发送命令，不直接实现标准化业务逻辑。
 
