@@ -18,7 +18,7 @@
 将 `BS-CAD-Tools.bundle` 整个目录复制到：
 
 ```text
-C:\ProgramData\Autodesk\ApplicationPlugins\
+%ProgramData%\Autodesk\ApplicationPlugins\
 ```
 
 重启 AutoCAD 后插件自动加载。

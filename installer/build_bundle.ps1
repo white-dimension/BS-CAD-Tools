@@ -52,6 +52,6 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "`n── Next steps ──" -ForegroundColor Yellow
 Write-Host "  1. Copy dist/BS-CAD-Tools.bundle to target computer"
 Write-Host "  2. Place it under:"
-Write-Host "     C:\ProgramData\Autodesk\ApplicationPlugins\"
+Write-Host "     %ProgramData%\Autodesk\ApplicationPlugins\"
 Write-Host "  3. Restart AutoCAD"
 Write-Host "  4. Run ShowPanel or LY"

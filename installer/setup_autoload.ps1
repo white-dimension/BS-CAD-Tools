@@ -6,7 +6,7 @@ $dllSourceDir = Join-Path $projectDir "bin\Debug\net10.0-windows"
 $dllSource = Join-Path $dllSourceDir "BS.CAD.Tools.dll"
 $pdbSource = Join-Path $dllSourceDir "BS.CAD.Tools.pdb"
 
-$bundleRoot = "C:\ProgramData\Autodesk\ApplicationPlugins\BS-CAD-Tools.bundle"
+$bundleRoot = Join-Path $env:ProgramData "Autodesk\ApplicationPlugins\BS-CAD-Tools.bundle"
 $contentsDir = Join-Path $bundleRoot "Contents"
 $manifestDest = Join-Path $bundleRoot "PackageContents.xml"
 $dllDest = Join-Path $contentsDir "BS.CAD.Tools.dll"
